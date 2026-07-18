@@ -1,1 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>律师名片生成器</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+  background:#ececec;
+  color:#222;
+  padding:28px;
+}
+h2{max-width:1260px;margin:0 auto 22px;font-size:28px}
+.wrap{
+  max-width:1260px;
+  margin:auto;
+  display:grid;
+  grid-template-columns:350px 1fr;
+  gap:28px;
+  align-items:start;
+}
+.panel{
+  background:#fff;
+  padding:22px;
+  border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,.08);
+}
+label{
+  display:block;
+  margin:13px 0 6px;
+  font-weight:600;
+}
+input{
+  width:100%;
+  padding:10px 11px;
+  border:1px solid #d7d7d7;
+  border-radius:7px;
+  font-size:15px;
+}
+.file-tip{font-size:12px;color:#777;margin-top:4px}
+button{
+  width:100%;
+  margin-top:20px;
+  padding:12px 20px;
+  background:#151515;
+  color:#fff;
+  border:0;
+  border-radius:8px;
+  font-size:16px;
+  cursor:pointer;
+}
+.preview{overflow:auto;padding-bottom:10px}
+.card{
+  width:900px;
+  height:500px;
+  position:relative;
+  overflow:hidden;
+  border-radius:8px;
+  color:#fff;
+  background:
+    radial-gradient(circle at 15% 15%,rgba(255,255,255,.07),transparent 35%),
+    linear-gradient(135deg,#242424 0%,#111 58%,#070707 100%);
+  box-shadow:0 14px 35px rgba(0,0,0,.28);
+}
+.card:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:.18;
+  pointer-events:none;
+  background-image:
+    repeating-linear-gradient(18deg,rgba(255,255,255,.025) 0 1px,transparent 1px 4px);
+}
+.avatar{
+  position:absolute;
+  left:68px;
+  top:88px;
+  width:150px;
+  height:190px;
+  object-fit:cover;
+  border-radius:4px;
+  border:2px solid rgba(215,181,109,.75);
+  background:rgba(255,255,255,.08);
+  display:none;
+  z-index:1;
+}
+.identity{
+  position:absolute;
+  top:106px;
+  left:260px;
+  right:150px;
+  text-align:center;
+  z-index:1;
+}
+.name{
+  font-size:58px;
+  font-family:"STSong","SimSun",serif;
+  letter-spacing:10px;
+  line-height:1.1;
+}
+.firm-row{
+  margin-top:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  color:#d8b66f;
+}
+.logo{
+  width:54px;
+  height:54px;
+  object-fit:contain;
+  display:none;
+}
+.firm{
+  font-size:30px;
+  font-family:"STKaiti","KaiTi",serif;
+  letter-spacing:2px;
+}
+.title{
+  font-size:25px;
+  margin-top:18px;
+}
+.bottom{
+  position:absolute;
+  left:58px;
+  right:58px;
+  bottom:42px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:end;
+  gap:24px;
+  z-index:1;
+}
+.contact{
+  font-size:22px;
+  line-height:1.9;
+}
+.qr{
+  width:104px;
+  height:104px;
+  object-fit:contain;
+  background:#fff;
+  border:6px solid #fff;
+  display:none;
+}
+.placeholder{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:rgba(255,255,255,.3);
+  font-size:14px;
+}
+@media(max-width:900px){
+  body{padding:16px}
+  .wrap{grid-template-columns:1fr}
+  .preview{width:100%}
+}
+</style>
+</head>
+<body>
+<h2>高级合伙人名片生成器</h2>
+
+<div class="wrap">
+  <div class="panel">
+    <label>姓名</label>
+    <input id="nameInput" value="陈默" oninput="updateCard()">
+
+    <label>律所名称</label>
+    <input id="firmInput" value="衡平律师事务所" oninput="updateCard()">
+
+    <label>职位</label>
+    <input id="titleInput" value="高级合伙人｜商事诉讼" oninput="updateCard()">
+
+    <label>电话</label>
+    <input id="phoneInput" value="138-1234-5678" oninput="updateCard()">
+
+    <label>邮箱</label>
+    <input id="emailInput" value="chenmo@hengping.com" oninput="updateCard()">
+
+    <label>上传头像</label>
+    <input type="file" accept="image/*" onchange="loadImage(event,'avatar')">
+    <div class="file-tip">建议使用竖版证件照或半身照</div>
+
+    <label>上传 Logo</label>
+    <input type="file" accept="image/*" onchange="loadImage(event,'logo')">
+    <div class="file-tip">建议使用透明背景 PNG</div>
+
+    <label>上传二维码</label>
+    <input type="file" accept="image/*" onchange="loadImage(event,'qr')">
+
+    <button onclick="downloadCard()">导出名片 PNG</button>
+  </div>
+
+  <div class="preview">
+    <div class="card" id="card">
+      <img id="avatar" class="avatar" alt="头像">
+
+      <div class="identity">
+        <div id="nameText" class="name">陈默</div>
+
+        <div class="firm-row">
+          <img id="logo" class="logo" alt="Logo">
+          <div id="firmText" class="firm">衡平律师事务所</div>
+        </div>
+
+        <div id="titleText" class="title">高级合伙人｜商事诉讼</div>
+      </div>
+
+      <div class="bottom">
+        <div class="contact">
+          <div>☎ 电话：<span id="phoneText">138-1234-5678</span></div>
+          <div>✉ 邮箱：<span id="emailText">chenmo@hengping.com</span></div>
+        </div>
+        <img id="qr" class="qr" alt="二维码">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateCard(){
+  document.getElementById('nameText').innerText =
+    document.getElementById('nameInput').value;
+  document.getElementById('firmText').innerText =
+    document.getElementById('firmInput').value;
+  document.getElementById('titleText').innerText =
+    document.getElementById('titleInput').value;
+  document.getElementById('phoneText').innerText =
+    document.getElementById('phoneInput').value;
+  document.getElementById('emailText').innerText =
+    document.getElementById('emailInput').value;
+}
+
+function loadImage(event, targetId){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = document.getElementById(targetId);
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function downloadCard(){
+  if(typeof html2canvas === 'undefined'){
+    alert('导出组件加载失败，请检查网络连接后重试。');
+    return;
+  }
+  html2canvas(document.getElementById('card'),{
+    scale:2,
+    useCORS:true,
+    backgroundColor:null
+  }).then(canvas=>{
+    const link=document.createElement('a');
+    link.download='律师名片.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+  });
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</body>
+</html>
 
