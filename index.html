@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>我的文档</title>
+
+<style>
+
+body{
+    font-family:微软雅黑;
+}
+
+
+.folder{
+    cursor:pointer;
+    font-size:20px;
+}
+
+
+.child{
+    display:none;
+    margin-left:30px;
+}
+
+
+a{
+    text-decoration:none;
+}
+
+
+</style>
+
+
+<script>
+
+function openFolder(id){
+
+let x=document.getElementById(id);
+
+
+if(x.style.display=="block"){
+
+x.style.display="none";
+
+}
+
+else{
+
+x.style.display="block";
+
+}
+
+}
+
+</script>
+
+
+</head>
+
+
+<body>
+
+
+<h1>📚 我的文档</h1>
+
+
+
+<div class="folder"
+onclick="openFolder('one')">
+
+📁 第一章
+
+</div>
+
+
+<div id="one" class="child">
+
+
+<p>
+📄 
+<a href="chapter1/page1.html">
+1.1 简介
+</a>
+</p>
+
+
+<p>
+📄 
+<a href="chapter1/page2.html">
+1.2 安装
+</a>
+</p>
+
+
+</div>
+
+
+
+</body>
+
+</html>
