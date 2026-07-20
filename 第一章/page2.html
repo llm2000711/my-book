@@ -1,449 +1,1445 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>资金闭环图绘制工具</title>
-<style>
-  :root{
-    --bg:#050816;--panel:rgba(13,20,42,.88);--text:#edf7ff;--muted:#91a6c7;--line:rgba(121,157,255,.24);
-    --primary:#00e5ff;--primary2:#8b5cf6;--danger:#ff2e88;--ok:#28f0a3;--shadow:0 16px 48px rgba(0,229,255,.10),0 0 28px rgba(139,92,246,.08)
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--text);
-  background:
-    radial-gradient(circle at 15% 20%,rgba(0,229,255,.13),transparent 28%),
-    radial-gradient(circle at 85% 15%,rgba(139,92,246,.18),transparent 32%),
-    radial-gradient(circle at 70% 85%,rgba(255,46,136,.10),transparent 28%),var(--bg)}
-  header{height:68px;background:linear-gradient(90deg,rgba(5,10,27,.96),rgba(20,12,48,.96));color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 2px 12px rgba(0,0,0,.18)}
-  header h1{font-size:20px;margin:0}.sub{font-size:12px;color:#b8c3dc;margin-top:4px}
-  .top-actions{display:flex;gap:8px}
-  button,.btn{border:1px solid rgba(94,168,255,.22);border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;background:rgba(25,39,74,.86);color:#dcecff;transition:.2s;box-shadow:inset 0 0 18px rgba(0,229,255,.03)}
-  button:hover,.btn:hover{transform:translateY(-1px)}
-  .primary{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#04101c;font-weight:700;box-shadow:0 0 20px rgba(0,229,255,.25)}.danger{background:#fff0f0;color:#c92a2a}
-  .layout{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;height:calc(100vh - 68px)}
-  .panel{background:var(--panel);border:1px solid rgba(90,170,255,.18);backdrop-filter:blur(16px);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
-  .sidebar{display:flex;flex-direction:column;min-height:0}
-  .section{padding:16px;border-bottom:1px solid rgba(129,159,222,.12)}
-  .section h3{font-size:14px;margin:0 0 12px}
-  .drop{border:2px dashed rgba(0,229,255,.48);border-radius:12px;padding:24px 14px;text-align:center;background:linear-gradient(135deg,rgba(0,229,255,.05),rgba(139,92,246,.08));cursor:pointer;box-shadow:inset 0 0 28px rgba(0,229,255,.05)}
-  .drop.drag{border-color:#ff2e88;background:rgba(255,46,136,.10);box-shadow:0 0 28px rgba(255,46,136,.22)}
-  .drop strong{display:block;margin-bottom:7px}.drop small{color:var(--muted);line-height:1.6}
-  input[type=file]{display:none}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{margin-bottom:9px}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
-  select,input[type=text],input[type=number]{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px;background:#0b1329;color:var(--text)}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .stat{background:linear-gradient(145deg,rgba(21,35,72,.88),rgba(23,18,55,.92));border:1px solid rgba(0,229,255,.14);border-radius:9px;padding:10px;text-align:center}
-  .stat b{font-size:18px;display:block}.stat span{font-size:11px;color:var(--muted)}
-  .hint{font-size:12px;line-height:1.55;color:var(--muted)}
-  .table-wrap{overflow:auto;flex:1;min-height:110px}
-  table{border-collapse:collapse;width:100%;font-size:12px}
-  th,td{padding:8px;border-bottom:1px solid rgba(129,159,222,.12);text-align:left;white-space:nowrap}
-  th{position:sticky;top:0;background:#101a38;z-index:1;color:#9eeeff}
-  .main{display:flex;flex-direction:column;min-width:0}
-  .toolbar{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid rgba(129,159,222,.12)}
-  .toolbar-left,.toolbar-right{display:flex;gap:8px;align-items:center}
-  .canvas-wrap{position:relative;flex:1;overflow:hidden;background:
-    linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(139,92,246,.035) 1px,transparent 1px),
-    radial-gradient(circle at 50% 50%,rgba(36,54,101,.42),rgba(4,8,22,.96));
-    background-size:24px 24px,24px 24px,100% 100%}
-  #svg{width:100%;height:100%;display:block;user-select:none}
-  .legend{position:absolute;left:14px;bottom:14px;background:rgba(8,16,35,.90);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
-  .legend i{display:inline-block;width:24px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
-  .cycle-list{position:absolute;right:14px;top:14px;max-width:320px;max-height:180px;overflow:auto;background:rgba(8,16,35,.92);border:1px solid var(--line);border-radius:10px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,.08);font-size:12px}
-  .cycle-list h4{margin:0 0 8px}.cycle-item{padding:6px 7px;background:rgba(255,46,136,.12);color:#ff9ac7;border:1px solid rgba(255,46,136,.22);border-radius:6px;margin-top:5px}
-  .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#8994a8;text-align:center}
-  .empty b{display:block;font-size:17px;color:#596579;margin-bottom:8px}
-  .node text{font-size:12px;pointer-events:none}.edge-label{font-size:11px;fill:#475467;paint-order:stroke;stroke:white;stroke-width:4px}
-  .toast{position:fixed;right:20px;bottom:20px;background:#111827;color:#fff;padding:10px 15px;border-radius:9px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:99}
-  .toast.show{opacity:1;transform:translateY(0)}
-  .modal{position:fixed;inset:0;background:rgba(8,15,30,.48);display:none;align-items:center;justify-content:center;z-index:100}
-  .modal.open{display:flex}.modal-card{width:min(720px,92vw);max-height:80vh;overflow:auto;background:white;border-radius:14px;padding:20px}
-  pre{background:#f6f8fc;padding:12px;border-radius:8px;overflow:auto;font-size:12px}
-  @media(max-width:900px){.layout{grid-template-columns:1fr;height:auto}.sidebar{min-height:600px}.main{height:75vh}}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>资金闭环图绘制工具 - 层级分色拖拽版</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #162033;
+      --muted: #667085;
+      --line: #d0d5dd;
+      --primary: #2563eb;
+      --primary-2: #1d4ed8;
+      --shadow: 0 12px 30px rgba(16, 24, 40, .08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background: radial-gradient(circle at top left, #eaf1ff 0, transparent 34%), var(--bg);
+      color: var(--text);
+    }
+
+    header { padding: 26px 32px 16px; }
+
+    .title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    h1 { font-size: 28px; margin: 0; letter-spacing: .02em; }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 370px 1fr;
+      gap: 18px;
+      padding: 0 32px 32px;
+      min-height: calc(100vh - 96px);
+    }
+
+    .panel, .canvas-card {
+      background: rgba(255,255,255,.9);
+      border: 1px solid rgba(208,213,221,.85);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .panel { padding: 18px; align-self: start; }
+
+    .section { padding: 14px 0; border-bottom: 1px solid #edf0f5; }
+    .section:first-child { padding-top: 0; }
+    .section:last-child { border-bottom: none; padding-bottom: 0; }
+
+    .section h2 { font-size: 15px; margin: 0 0 12px; }
+
+    .dropzone {
+      border: 1.5px dashed #94a3b8;
+      border-radius: 16px;
+      padding: 18px 14px;
+      background: #f8fafc;
+      text-align: center;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+
+    .dropzone strong { display: block; margin-bottom: 6px; }
+    .dropzone span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+    input[type="file"] { display: none; }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #eef2f7;
+      color: #1f2937;
+      transition: .16s ease;
+      font-weight: 600;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button.primary { background: var(--primary); color: #fff; }
+    button.primary:hover { background: var(--primary-2); }
+    button.ghost { background: transparent; border: 1px solid var(--line); }
+    button.warn { background: #fff7ed; color: #9a3412; }
+    button.success { background: #ecfdf3; color: #027a48; }
+    button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+
+    .field {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    label { font-size: 13px; color: #344054; }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 8px;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f2f4f7;
+      color: #344054;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .status.ok { background: #ecfdf3; color: #027a48; }
+    .status.err { background: #fef2f2; color: #b91c1c; }
+    .status.warn { background: #fffbeb; color: #92400e; }
+
+    .canvas-card {
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #edf0f5;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-left { display: flex; flex-direction: column; gap: 3px; }
+    .toolbar-title { font-weight: 800; font-size: 16px; }
+    .toolbar-sub { color: var(--muted); font-size: 12px; }
+    .toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    #graphWrap {
+      position: relative;
+      min-height: 650px;
+      overflow: auto;
+      background:
+        linear-gradient(#f8fafc 1px, transparent 1px),
+        linear-gradient(90deg, #f8fafc 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    svg {
+      display: block;
+      min-width: 1000px;
+      min-height: 680px;
+      background: rgba(255,255,255,.3);
+      user-select: none;
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+      padding: 28px;
+      pointer-events: none;
+    }
+
+    .empty strong {
+      color: #344054;
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .legend {
+      padding: 12px 16px;
+      border-top: 1px solid #edf0f5;
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      gap: 12px 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .dot {
+      width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+      vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(0,0,0,.08);
+    }
+
+    .table-wrap {
+      max-height: 210px;
+      overflow: auto;
+      border: 1px solid #edf0f5;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 520px;
+    }
+
+    th, td {
+      padding: 8px 9px;
+      border-bottom: 1px solid #edf0f5;
+      text-align: left;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f8fafc;
+      z-index: 1;
+    }
+
+    .layer-bg {
+      fill: rgba(248,250,252,.7);
+      stroke: #e5e7eb;
+      stroke-dasharray: 6 8;
+    }
+
+    .layer-title {
+      font-size: 12px;
+      fill: #667085;
+      font-weight: 700;
+    }
+
+    .node { cursor: grab; }
+    .node.dragging { cursor: grabbing; }
+
+    .node circle {
+      filter: drop-shadow(0 8px 12px rgba(16, 24, 40, .14));
+    }
+
+    .node text {
+      font-size: 13px;
+      font-weight: 800;
+      fill: #1e293b;
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .node .sub {
+      font-size: 11px;
+      font-weight: 500;
+      fill: #64748b;
+    }
+
+    .edge-label {
+      font-size: 11px;
+      fill: #344054;
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .edge {
+      fill: none;
+      stroke-linecap: round;
+      opacity: .78;
+      transition: opacity .12s ease, stroke-width .12s ease;
+    }
+
+    .edge.loop { stroke-dasharray: 8 6; }
+
+    .node:hover circle { stroke-width: 4; }
+    .edge:hover { opacity: 1; }
+
+    .cycle-badge {
+      font-size: 11px;
+      font-weight: 800;
+      fill: #b42318;
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 3px;
+      pointer-events: none;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #e4e7ec;
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 13px;
+      color: #344054;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; padding: 0 18px 24px; }
+      header { padding: 22px 18px 14px; }
+      #graphWrap { min-height: 560px; }
+    }
+
+    @media print {
+      body { background: white; }
+      header, .panel, .toolbar-actions, .legend { display: none; }
+      .layout { display: block; padding: 0; }
+      .canvas-card { border: 0; box-shadow: none; }
+      #graphWrap { overflow: visible; }
+      svg { min-width: 0; width: 100%; }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-<header>
-  <div><h1>资金闭环图绘制工具</h1><div class="sub">导入交易明细，自动生成可拖拽的霓虹资金流向图并识别闭环</div></div>
-  <div class="top-actions">
-    <button id="sampleBtn">加载示例</button>
-    <button id="helpBtn">格式说明</button>
-    <button class="primary" id="exportHtmlBtn">导出 HTML</button>
-  </div>
-</header>
-
-<div class="layout">
-  <aside class="panel sidebar">
-    <div class="section">
-      <h3>1. 导入文件</h3>
-      <div class="drop" id="drop">
-        <strong>点击或拖拽文件到这里</strong>
-        <small>支持 CSV、TXT、JSON、XLSX、XLS<br>Excel 解析需要联网加载组件</small>
+  <header>
+    <div class="title">
+      <div>
+        <h1>资金闭环图绘制工具</h1>
+        <p class="subtitle">导入资金流水后，自动识别付款方、收款方、金额，按资金流层级分色绘制流向图，使用更小箭头，并支持拖拽调整节点。</p>
       </div>
-      <input id="fileInput" type="file" accept=".csv,.txt,.json,.xlsx,.xls" />
+      <div class="pill">层级分色 · 节点拖拽 · 小箭头版</div>
     </div>
+  </header>
 
-    <div class="section">
-      <h3>2. 字段映射</h3>
-      <div class="row">
-        <div class="field"><label>付款方 / 来源</label><select id="sourceCol"></select></div>
-        <div class="field"><label>收款方 / 去向</label><select id="targetCol"></select></div>
+  <main class="layout">
+    <aside class="panel">
+      <div class="section">
+        <h2>1. 导入文件</h2>
+        <div id="dropzone" class="dropzone">
+          <strong>点击或拖拽文件到这里</strong>
+          <span>支持 CSV、TXT、JSON；XLS/XLSX 在联网时支持解析。建议字段包含：付款方、收款方、金额、时间、备注。</span>
+          <input id="fileInput" type="file" accept=".csv,.txt,.json,.xlsx,.xls" />
+        </div>
+        <div class="btn-row">
+          <button class="ghost" id="loadSample">载入示例数据</button>
+          <button class="ghost" id="downloadTemplate">下载 CSV 模板</button>
+        </div>
+        <div id="status" class="status">尚未导入文件。</div>
       </div>
-      <div class="row">
+
+      <div class="section">
+        <h2>2. 字段映射</h2>
+        <div class="field"><label>付款方</label><select id="sourceCol"></select></div>
+        <div class="field"><label>收款方</label><select id="targetCol"></select></div>
         <div class="field"><label>金额</label><select id="amountCol"></select></div>
-        <div class="field"><label>日期（可选）</label><select id="dateCol"></select></div>
+        <div class="field"><label>时间</label><select id="dateCol"></select></div>
+        <div class="field"><label>备注</label><select id="memoCol"></select></div>
+        <div class="btn-row">
+          <button class="primary" id="drawBtn" disabled>重新绘制</button>
+          <button id="autoMapBtn" disabled>自动识别</button>
+        </div>
+        <p class="hint">若自动识别不准确，可手动选择列名后点击“重新绘制”。</p>
       </div>
-      <div class="field"><label>备注（可选）</label><select id="remarkCol"></select></div>
-      <button class="primary" style="width:100%" id="drawBtn">自动绘制资金流向图</button>
-    </div>
 
-    <div class="section">
-      <h3>数据概览</h3>
-      <div class="stats">
-        <div class="stat"><b id="txCount">0</b><span>交易笔数</span></div>
-        <div class="stat"><b id="nodeCount">0</b><span>主体数量</span></div>
-        <div class="stat"><b id="cycleCount">0</b><span>识别闭环</span></div>
+      <div class="section">
+        <h2>3. 图形设置</h2>
+        <div class="field">
+          <label>最小金额</label>
+          <input id="minAmount" type="number" value="0" step="100" />
+        </div>
+        <div class="field">
+          <label>节点布局</label>
+          <select id="layoutMode">
+            <option value="layer">层级分布</option>
+            <option value="circle">闭环圆形</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>分色方式</label>
+          <select id="colorMode">
+            <option value="layer">按资金流层级</option>
+            <option value="cycle">闭环优先高亮</option>
+            <option value="amount">按金额强弱</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>层级方向</label>
+          <select id="layerDirection">
+            <option value="lr">从左到右</option>
+            <option value="tb">从上到下</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>金额单位</label>
+          <input id="unitName" type="text" value="元" />
+        </div>
+        <div class="field">
+          <label>图标题</label>
+          <input id="chartTitle" type="text" value="资金流向闭环图" />
+        </div>
+        <div class="btn-row">
+          <button id="resetLayout" disabled>恢复自动布局</button>
+        </div>
+        <p class="hint">提示：在图中按住节点即可拖拽，适合把交叉线较多的节点手动拉开。</p>
       </div>
-    </div>
 
-    <div class="section">
-      <h3>绘图设置</h3>
-      <div class="row">
-        <div class="field"><label>布局</label><select id="layoutMode"><option value="circle">环形布局</option><option value="layer">分层布局</option></select></div>
-        <div class="field"><label>聚合</label><select id="aggregate"><option value="yes">同主体合并</option><option value="no">逐笔显示</option></select></div>
+      <div class="section">
+        <h2>4. 数据预览</h2>
+        <div id="tablePreview" class="table-wrap">
+          <table><tbody><tr><td style="color:#667085;">暂无数据</td></tr></tbody></table>
+        </div>
       </div>
-      <div class="row">
-        <div class="field"><label>最小金额</label><input id="minAmount" type="number" value="0" step="0.01"></div>
-        <div class="field"><label>节点搜索</label><input id="searchNode" type="text" placeholder="输入名称"></div>
-      </div>
-      <div class="hint">红色连线表示至少属于一个资金闭环；线条越粗，累计金额越大。</div>
-    </div>
+    </aside>
 
-    <div class="table-wrap"><table id="dataTable"><thead></thead><tbody></tbody></table></div>
-  </aside>
-
-  <main class="panel main">
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <button id="zoomIn">放大</button><button id="zoomOut">缩小</button><button id="resetView">重置视图</button>
+    <section class="canvas-card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <div class="toolbar-title" id="graphTitle">资金流向闭环图</div>
+          <div class="toolbar-sub" id="graphSub">导入文件后自动生成</div>
+        </div>
+        <div class="toolbar-actions">
+          <button class="success" id="exportSvg" disabled>导出 SVG</button>
+          <button class="success" id="exportPng" disabled>导出 PNG</button>
+          <button class="success" id="exportHtml" disabled>导出 HTML</button>
+          <button class="warn" id="clearBtn">清空</button>
+        </div>
       </div>
-      <div class="toolbar-right">
-        <button id="exportSvg">导出 SVG</button><button id="exportPng">导出 PNG</button>
+      <div id="graphWrap">
+        <svg id="svg" width="1260" height="780" role="img" aria-label="资金流向图"></svg>
+        <div id="empty" class="empty">
+          <div>
+            <strong>等待导入资金流水</strong>
+            <span>导入文件后，系统会自动合并同一付款方到收款方的金额并绘制层级流向箭头。</span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="canvas-wrap" id="canvasWrap">
-      <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
-      <div class="empty" id="empty"><div><b>尚未生成资金流向图</b>请先导入数据，或点击“加载示例”</div></div>
-      <div class="legend" id="legend" style="display:none"><div><i style="background:#718096"></i>普通资金流</div><div style="margin-top:5px"><i style="background:#e5484d"></i>闭环资金流</div></div>
-      <div class="cycle-list" id="cyclePanel" style="display:none"><h4>识别到的资金闭环</h4><div id="cycleItems"></div></div>
-    </div>
+      <div class="legend" id="legend">
+        <span><i class="dot" style="background:#2563eb;"></i>第 1 层资金流</span>
+        <span><i class="dot" style="background:#16a34a;"></i>第 2 层资金流</span>
+        <span><i class="dot" style="background:#f59e0b;"></i>第 3 层资金流</span>
+        <span><i class="dot" style="background:#ef4444;"></i>闭环相关流向</span>
+        <span>箭头粗细表示累计金额大小；节点可拖拽</span>
+      </div>
+    </section>
   </main>
-</div>
-
-<div class="toast" id="toast"></div>
-<div class="modal" id="modal"><div class="modal-card">
-  <h2 style="margin-top:0">文件格式说明</h2>
-  <p>建议使用以下字段。导入后也可以手动映射列名：</p>
-  <pre>付款方,收款方,金额,日期,备注
-甲公司,乙公司,100000,2026-01-02,采购款
-乙公司,丙公司,85000,2026-01-03,服务费
-丙公司,甲公司,60000,2026-01-04,往来款</pre>
-  <p>TXT 可使用制表符、逗号、竖线或分号分隔，也支持逐行键值格式：</p>
-  <pre>付款方=甲公司 收款方=乙公司 金额=100000 日期=2026-01-02</pre>
-  <p>JSON 格式可使用对象数组，例如：</p>
-  <pre>[
-  {"付款方":"甲公司","收款方":"乙公司","金额":100000,"日期":"2026-01-02"}
-]</pre>
-  <p class="hint">节点可直接拖动调整位置；拖动空白区域可平移画布。工具在浏览器本地处理数据，不会主动上传文件。Excel 文件解析通过公共 CDN 动态加载 SheetJS 组件。</p>
-  <div style="text-align:right"><button class="primary" id="closeModal">知道了</button></div>
-</div></div>
 
 <script>
-let rawRows=[], headers=[], graphState=null, scale=1, panX=0, panY=0, dragging=false, dragStart=null, draggingNode=null, nodeMoved=false;
+(function() {
+  "use strict";
 
-const $=id=>document.getElementById(id);
-function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function fmt(n){return Number(n).toLocaleString('zh-CN',{maximumFractionDigits:2})}
-function parseMoney(v){if(typeof v==='number')return v;return Number(String(v??'').replace(/[￥¥,\s]/g,''))||0}
-
-function parseCSV(text){
-  const rows=[];let row=[],cell='',q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i],n=text[i+1];
-    if(c==='"'&&q&&n==='"'){cell+='"';i++}
-    else if(c==='"'){q=!q}
-    else if(c===','&&!q){row.push(cell);cell=''}
-    else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);cell='';if(row.some(x=>x!==''))rows.push(row);row=[]}
-    else cell+=c;
-  }
-  row.push(cell);if(row.some(x=>x!==''))rows.push(row);
-  const hs=rows.shift()||[];
-  return rows.map(r=>Object.fromEntries(hs.map((h,i)=>[h.trim(),r[i]??''])));
-}
-
-
-function parseTXT(text){
-  const clean=text.trim();
-  if(!clean)return [];
-  // JSON content saved as .txt
-  if(clean.startsWith('[')||clean.startsWith('{')){
-    try{
-      const parsed=JSON.parse(clean);
-      return Array.isArray(parsed)?parsed:[parsed];
-    }catch(e){}
-  }
-  const lines=clean.split(/\r?\n/).filter(x=>x.trim());
-  // Auto-detect common delimiters
-  const candidates=['\t','|',';',','];
-  let delimiter=candidates
-    .map(d=>({d,score:lines.slice(0,8).reduce((s,l)=>s+(l.split(d).length-1),0)}))
-    .sort((a,b)=>b.score-a.score)[0];
-  if(delimiter&&delimiter.score>0){
-    if(delimiter.d===',')return parseCSV(clean);
-    const matrix=lines.map(line=>line.split(delimiter.d).map(x=>x.trim().replace(/^["']|["']$/g,'')));
-    const hs=matrix.shift()||[];
-    return matrix.map(r=>Object.fromEntries(hs.map((h,i)=>[h,r[i]??''])));
-  }
-  // Supports: 付款方=甲公司 收款方=乙公司 金额=1000
-  const kvRows=lines.map(line=>{
-    const obj={};
-    const matches=line.matchAll(/([^=：,\s]+)\s*[=：]\s*([^,\s]+)/g);
-    for(const m of matches)obj[m[1].trim()]=m[2].trim();
-    return obj;
-  }).filter(x=>Object.keys(x).length);
-  if(kvRows.length)return kvRows;
-  throw new Error('无法识别 TXT 格式，请使用制表符、逗号、竖线或分号分隔字段');
-}
-
-async function readFile(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(ext==='csv'||ext==='txt'){
-    const buf=await file.arrayBuffer();
-    let text;
-    try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('gb18030').decode(buf)}
-    text=text.replace(/^\uFEFF/,'');
-    if(ext==='txt') return parseTXT(text);
-    return parseCSV(text);
-  }
-  if(ext==='json') return JSON.parse(await file.text());
-  if(['xlsx','xls'].includes(ext)){
-    await loadXLSX();
-    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
-    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-  }
-  throw new Error('不支持的文件格式');
-}
-function loadXLSX(){
-  if(window.XLSX)return Promise.resolve();
-  return new Promise((resolve,reject)=>{
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    s.onload=resolve;s.onerror=()=>reject(new Error('Excel 解析组件加载失败，请检查网络'));
-    document.head.appendChild(s);
-  })
-}
-function loadRows(rows,name='数据'){
-  if(!Array.isArray(rows)||!rows.length)throw new Error('文件中没有可用数据');
-  rawRows=rows;headers=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-  fillMappings();renderTable();$('txCount').textContent=rawRows.length;toast(`${name} 已导入，共 ${rawRows.length} 条`);
-}
-function fillMappings(){
-  const selects=['sourceCol','targetCol','amountCol','dateCol','remarkCol'];
-  const guess={
-    sourceCol:['付款方','转出方','来源','source','from','付款账户','付款人','借方'],
-    targetCol:['收款方','转入方','去向','target','to','收款账户','收款人','贷方'],
-    amountCol:['金额','交易金额','amount','money','发生额'],
-    dateCol:['日期','交易日期','时间','date','time'],
-    remarkCol:['备注','摘要','用途','remark','memo','description']
+  const els = {
+    fileInput: document.getElementById("fileInput"),
+    dropzone: document.getElementById("dropzone"),
+    status: document.getElementById("status"),
+    sourceCol: document.getElementById("sourceCol"),
+    targetCol: document.getElementById("targetCol"),
+    amountCol: document.getElementById("amountCol"),
+    dateCol: document.getElementById("dateCol"),
+    memoCol: document.getElementById("memoCol"),
+    drawBtn: document.getElementById("drawBtn"),
+    autoMapBtn: document.getElementById("autoMapBtn"),
+    loadSample: document.getElementById("loadSample"),
+    downloadTemplate: document.getElementById("downloadTemplate"),
+    minAmount: document.getElementById("minAmount"),
+    layoutMode: document.getElementById("layoutMode"),
+    colorMode: document.getElementById("colorMode"),
+    layerDirection: document.getElementById("layerDirection"),
+    unitName: document.getElementById("unitName"),
+    chartTitle: document.getElementById("chartTitle"),
+    graphTitle: document.getElementById("graphTitle"),
+    graphSub: document.getElementById("graphSub"),
+    svg: document.getElementById("svg"),
+    empty: document.getElementById("empty"),
+    tablePreview: document.getElementById("tablePreview"),
+    exportSvg: document.getElementById("exportSvg"),
+    exportPng: document.getElementById("exportPng"),
+    exportHtml: document.getElementById("exportHtml"),
+    clearBtn: document.getElementById("clearBtn"),
+    resetLayout: document.getElementById("resetLayout"),
+    legend: document.getElementById("legend")
   };
-  selects.forEach(id=>{
-    const sel=$(id);sel.innerHTML='<option value="">-- 未选择 --</option>'+headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join('');
-    const found=headers.find(h=>guess[id].some(g=>h.toLowerCase().includes(g.toLowerCase())));
-    if(found)sel.value=found;
-  });
-}
-function renderTable(){
-  $('dataTable').querySelector('thead').innerHTML='<tr>'+headers.slice(0,6).map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
-  $('dataTable').querySelector('tbody').innerHTML=rawRows.slice(0,100).map(r=>'<tr>'+headers.slice(0,6).map(h=>`<td>${esc(r[h])}</td>`).join('')+'</tr>').join('');
-}
-function buildGraph(){
-  const sc=$('sourceCol').value,tc=$('targetCol').value,ac=$('amountCol').value,dc=$('dateCol').value,rc=$('remarkCol').value;
-  if(!sc||!tc||!ac){toast('请选择付款方、收款方和金额字段');return}
-  const min=Number($('minAmount').value)||0, agg=$('aggregate').value==='yes';
-  let tx=rawRows.map((r,i)=>({source:String(r[sc]??'').trim(),target:String(r[tc]??'').trim(),amount:parseMoney(r[ac]),date:dc?r[dc]:'',remark:rc?r[rc]:'',index:i}))
-    .filter(x=>x.source&&x.target&&x.amount>=min);
-  const nodes=[...new Set(tx.flatMap(x=>[x.source,x.target]))].map(id=>({id}));
-  let edges;
-  if(agg){
-    const map=new Map();
-    tx.forEach(t=>{const k=t.source+'\u0000'+t.target;if(!map.has(k))map.set(k,{source:t.source,target:t.target,amount:0,count:0,rows:[]});const e=map.get(k);e.amount+=t.amount;e.count++;e.rows.push(t)});
-    edges=[...map.values()];
-  }else edges=tx.map(t=>({...t,count:1,rows:[t]}));
-  const cycles=findCycles(nodes.map(n=>n.id),edges);
-  const cycleEdges=new Set();
-  cycles.forEach(c=>{for(let i=0;i<c.length-1;i++)cycleEdges.add(c[i]+'\u0000'+c[i+1])});
-  edges.forEach(e=>e.inCycle=cycleEdges.has(e.source+'\u0000'+e.target));
-  graphState={nodes,edges,cycles,tx};
-  $('txCount').textContent=tx.length;$('nodeCount').textContent=nodes.length;$('cycleCount').textContent=cycles.length;
-  renderGraph();
-}
-function findCycles(nodeIds,edges){
-  const adj=new Map(nodeIds.map(n=>[n,[]]));edges.forEach(e=>adj.get(e.source)?.push(e.target));
-  const result=[],seen=new Set(),maxCycles=50;
-  function canon(c){
-    const arr=c.slice(0,-1),rots=arr.map((_,i)=>arr.slice(i).concat(arr.slice(0,i)));
-    rots.sort((a,b)=>a.join('\u0001').localeCompare(b.join('\u0001')));
-    return rots[0].join('\u0001');
-  }
-  function dfs(start,cur,path,vis){
-    if(result.length>=maxCycles)return;
-    for(const nxt of adj.get(cur)||[]){
-      if(nxt===start&&path.length>1){const cyc=path.concat(start),k=canon(cyc);if(!seen.has(k)){seen.add(k);result.push(cyc)}}
-      else if(!vis.has(nxt)&&path.length<Math.min(nodeIds.length,10)){vis.add(nxt);dfs(start,nxt,path.concat(nxt),vis);vis.delete(nxt)}
-    }
-  }
-  nodeIds.forEach(s=>dfs(s,s,[s],new Set([s])));
-  return result;
-}
-function renderGraph(preservePositions=false){
-  if(!graphState)return;
-  const svg=$('svg'),w=$('canvasWrap').clientWidth,h=$('canvasWrap').clientHeight;
-  const {nodes,edges,cycles}=graphState;
-  if(!nodes.length){svg.innerHTML='';$('empty').style.display='flex';return}
-  $('empty').style.display='none';$('legend').style.display='block';
-  $('cyclePanel').style.display=cycles.length?'block':'none';
-  $('cycleItems').innerHTML=cycles.map((c,i)=>`<div class="cycle-item">${i+1}. ${c.map(esc).join(' → ')}</div>`).join('');
-  if(!preservePositions)layoutNodes(nodes,w,h);
-  const maxAmt=Math.max(...edges.map(e=>e.amount),1),minAmt=Math.min(...edges.map(e=>e.amount),0);
-  const defs=`<defs>
-    <linearGradient id="nodeGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#102a4d"/><stop offset="55%" stop-color="#15204b"/><stop offset="100%" stop-color="#32185a"/></linearGradient>
-    <linearGradient id="nodeHitGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#063b52"/><stop offset="50%" stop-color="#123b67"/><stop offset="100%" stop-color="#40206b"/></linearGradient>
-    <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
-    <linearGradient id="cycleGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ff2e88"/><stop offset="100%" stop-color="#ff9f43"/></linearGradient>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#00e5ff"/></marker>
-    <marker id="arrowCycle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff2e88"/></marker>
-    <filter id="shadow"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#00e5ff" flood-opacity=".22"/></filter>
-    <filter id="cycleGlow"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ff2e88" flood-opacity=".55"/></filter>
-  </defs>`;
-  const nodeMap=new Map(nodes.map(n=>[n.id,n]));
-  let edgeSvg='';
-  edges.forEach((e,idx)=>{
-    const a=nodeMap.get(e.source),b=nodeMap.get(e.target);if(!a||!b)return;
-    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
-    const sx=a.x+ux*43,sy=a.y+uy*27,ex=b.x-ux*43,ey=b.y-uy*27;
-    const same=edges.filter(x=>x.source===e.source&&x.target===e.target).length>1;
-    const curve=same?(idx%2?20:-20):0, mx=(sx+ex)/2-uy*curve,my=(sy+ey)/2+ux*curve;
-    const d=`M${sx},${sy} Q${mx},${my} ${ex},${ey}`;
-    const width=1.5+5*Math.sqrt(e.amount/maxAmt);
-    const color=e.inCycle?'url(#cycleGrad)':'url(#edgeGrad)';
-    edgeSvg+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-opacity=".9" ${e.inCycle?'filter="url(#cycleGlow)"':''} marker-end="url(#${e.inCycle?'arrowCycle':'arrow'})"><title>${esc(e.source)} → ${esc(e.target)}\n金额：${fmt(e.amount)}\n笔数：${e.count}</title></path>`;
-    edgeSvg+=`<text class="edge-label" x="${mx}" y="${my-5}" text-anchor="middle">${fmt(e.amount)}</text>`;
-  });
-  const search=$('searchNode').value.trim().toLowerCase();
-  let nodeSvg='';
-  nodes.forEach(n=>{
-    const hit=!search||n.id.toLowerCase().includes(search),fill=hit?'url(#nodeHitGrad)':'url(#nodeGrad)',stroke=hit?'#00e5ff':'#7558dd';
-    nodeSvg+=`<g class="node" data-node-id="${esc(n.id)}" transform="translate(${n.x},${n.y})" filter="url(#shadow)" style="cursor:grab">
-      <rect x="-45" y="-25" width="90" height="50" rx="12" fill="${fill}" stroke="${stroke}" stroke-width="${hit?2:1}"/>
-      <text text-anchor="middle" dominant-baseline="middle" fill="#f4fbff" font-weight="600">${esc(n.id.length>12?n.id.slice(0,11)+'…':n.id)}</text>
-      <title>${esc(n.id)}</title></g>`;
-  });
-  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
-  svg.innerHTML=defs+`<g id="viewport" transform="translate(${panX},${panY}) scale(${scale})">${edgeSvg}${nodeSvg}</g>`;
-}
-function layoutNodes(nodes,w,h){
-  const mode=$('layoutMode').value,cx=w/2,cy=h/2;
-  if(mode==='circle'){
-    const r=Math.max(120,Math.min(w,h)*.36);
-    nodes.forEach((n,i)=>{const a=-Math.PI/2+i*2*Math.PI/nodes.length;n.x=cx+r*Math.cos(a);n.y=cy+r*Math.sin(a)})
-  }else{
-    const indeg=new Map(nodes.map(n=>[n.id,0]));graphState.edges.forEach(e=>indeg.set(e.target,(indeg.get(e.target)||0)+1));
-    const roots=nodes.filter(n=>indeg.get(n.id)===0).map(n=>n.id);const level=new Map(),q=(roots.length?roots:[nodes[0].id]).map(x=>(level.set(x,0),x));
-    while(q.length){const u=q.shift();graphState.edges.filter(e=>e.source===u).forEach(e=>{if(!level.has(e.target)){level.set(e.target,level.get(u)+1);q.push(e.target)}})}
-    nodes.forEach(n=>{if(!level.has(n.id))level.set(n.id,0)});
-    const groups={};nodes.forEach(n=>(groups[level.get(n.id)]??=[]).push(n));
-    const levs=Object.keys(groups).map(Number).sort((a,b)=>a-b);
-    levs.forEach((l,li)=>groups[l].forEach((n,i)=>{n.x=90+(w-180)*(levs.length===1?.5:li/(levs.length-1));n.y=70+(h-140)*(groups[l].length===1?.5:i/(groups[l].length-1))}));
-  }
-}
-function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-function exportSVG(){
-  if(!graphState)return toast('请先生成图');
-  const clone=$('svg').cloneNode(true);clone.setAttribute('width',$('canvasWrap').clientWidth);clone.setAttribute('height',$('canvasWrap').clientHeight);
-  download('资金闭环图.svg',new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml'}))
-}
-function exportPNG(){
-  if(!graphState)return toast('请先生成图');
-  const svgText=new XMLSerializer().serializeToString($('svg')),img=new Image(),url=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml'}));
-  img.onload=()=>{const c=document.createElement('canvas');c.width=$('canvasWrap').clientWidth*2;c.height=$('canvasWrap').clientHeight*2;const ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,$('canvasWrap').clientWidth,$('canvasWrap').clientHeight);c.toBlob(b=>download('资金闭环图.png',b));URL.revokeObjectURL(url)};img.src=url;
-}
-function exportHTML(){
-  let text='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
-  if(rawRows.length){
-    const payload=JSON.stringify(rawRows).replace(/</g,'\\u003c');
-    text=text.replace('</body>',`<script>window.addEventListener('load',()=>{try{loadRows(${payload},'内嵌数据');buildGraph()}catch(e){console.error(e)}})<\/script></body>`);
-  }
-  download('资金闭环图工具.html',new Blob([text],{type:'text/html;charset=utf-8'}));toast('HTML 已导出');
-}
-const sample=[
-  {付款方:'甲公司',收款方:'乙公司',金额:120000,日期:'2026-01-02',备注:'采购款'},
-  {付款方:'乙公司',收款方:'丙公司',金额:98000,日期:'2026-01-03',备注:'服务费'},
-  {付款方:'丙公司',收款方:'甲公司',金额:76000,日期:'2026-01-05',备注:'往来款'},
-  {付款方:'甲公司',收款方:'丁公司',金额:42000,日期:'2026-01-06',备注:'咨询费'},
-  {付款方:'丁公司',收款方:'戊公司',金额:35000,日期:'2026-01-08',备注:'项目款'},
-  {付款方:'戊公司',收款方:'甲公司',金额:28000,日期:'2026-01-09',备注:'退款'},
-  {付款方:'乙公司',收款方:'丁公司',金额:21000,日期:'2026-01-10',备注:'代付款'}
-];
 
-$('drop').onclick=()=>$('fileInput').click();
-$('fileInput').onchange=async e=>{try{loadRows(await readFile(e.target.files[0]),e.target.files[0].name)}catch(err){toast(err.message)}};
-$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};
-$('drop').ondragleave=()=>$('drop').classList.remove('drag');
-$('drop').ondrop=async e=>{e.preventDefault();$('drop').classList.remove('drag');try{const f=e.dataTransfer.files[0];loadRows(await readFile(f),f.name)}catch(err){toast(err.message)}};
-$('sampleBtn').onclick=()=>{loadRows(sample,'示例数据');buildGraph()};
-$('drawBtn').onclick=buildGraph;
-$('layoutMode').onchange=renderGraph;$('searchNode').oninput=renderGraph;
-$('zoomIn').onclick=()=>{scale=Math.min(3,scale*1.2);renderGraph(true)};$('zoomOut').onclick=()=>{scale=Math.max(.35,scale/1.2);renderGraph(true)};
-$('resetView').onclick=()=>{scale=1;panX=panY=0;renderGraph(true)};
-$('exportSvg').onclick=exportSVG;$('exportPng').onclick=exportPNG;$('exportHtmlBtn').onclick=exportHTML;
-$('helpBtn').onclick=()=>$('modal').classList.add('open');$('closeModal').onclick=()=>$('modal').classList.remove('open');
-$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};
-$('svg').addEventListener('mousedown',e=>{
-  const nodeEl=e.target.closest?.('.node');
-  if(nodeEl&&graphState){
-    draggingNode=graphState.nodes.find(n=>n.id===nodeEl.dataset.nodeId);
-    if(draggingNode){
-      const rect=$('svg').getBoundingClientRect();
-      const gx=(e.clientX-rect.left-panX)/scale,gy=(e.clientY-rect.top-panY)/scale;
-      dragStart={x:gx-draggingNode.x,y:gy-draggingNode.y};
-      nodeMoved=false;
-      nodeEl.style.cursor='grabbing';
-      e.stopPropagation();
+  let rawRows = [];
+  let columns = [];
+  let currentGraph = null;
+  let dragging = null;
+
+  const ns = "http://www.w3.org/2000/svg";
+
+  const layerColors = [
+    "#2563eb", "#16a34a", "#f59e0b", "#7c3aed", "#06b6d4",
+    "#db2777", "#84cc16", "#ea580c", "#0f766e", "#475569"
+  ];
+
+  const sampleRows = [
+    {"交易时间":"2026-01-03","付款方":"甲公司","收款方":"乙公司","金额":"500000","备注":"采购款"},
+    {"交易时间":"2026-01-05","付款方":"乙公司","收款方":"丙公司","金额":"360000","备注":"服务费"},
+    {"交易时间":"2026-01-09","付款方":"丙公司","收款方":"甲公司","金额":"220000","备注":"咨询费"},
+    {"交易时间":"2026-01-12","付款方":"甲公司","收款方":"丁公司","金额":"180000","备注":"工程款"},
+    {"交易时间":"2026-01-15","付款方":"丁公司","收款方":"乙公司","金额":"120000","备注":"分包款"},
+    {"交易时间":"2026-01-18","付款方":"戊个人","收款方":"甲公司","金额":"80000","备注":"借款"},
+    {"交易时间":"2026-01-20","付款方":"乙公司","收款方":"戊个人","金额":"76000","备注":"还款"},
+    {"交易时间":"2026-01-23","付款方":"甲公司","收款方":"己公司","金额":"95000","备注":"材料款"},
+    {"交易时间":"2026-01-26","付款方":"己公司","收款方":"庚公司","金额":"61000","备注":"劳务款"}
+  ];
+
+  function setStatus(msg, type = "") {
+    els.status.className = "status" + (type ? " " + type : "");
+    els.status.textContent = msg;
+  }
+
+  function normalizeHeader(v) {
+    return String(v == null ? "" : v).trim();
+  }
+
+  function normalizeName(v) {
+    return String(v == null ? "" : v).trim().replace(/\s+/g, " ");
+  }
+
+  function parseAmount(v) {
+    if (v == null) return 0;
+    if (typeof v === "number" && isFinite(v)) return Math.abs(v);
+    let s = String(v).trim();
+    if (!s) return 0;
+    s = s.replace(/[,，\s￥¥元人民币]/g, "");
+    if (/^\(.+\)$/.test(s)) s = "-" + s.slice(1, -1);
+    const n = parseFloat(s);
+    return isFinite(n) ? Math.abs(n) : 0;
+  }
+
+  function csvSplitLine(line, delimiter) {
+    const out = [];
+    let cur = "";
+    let quote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      const next = line[i + 1];
+      if (ch === '"') {
+        if (quote && next === '"') { cur += '"'; i++; }
+        else quote = !quote;
+      } else if (ch === delimiter && !quote) {
+        out.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    out.push(cur);
+    return out.map(x => x.trim());
+  }
+
+  function detectDelimiter(text) {
+    const first = text.split(/\r?\n/).find(x => x.trim()) || "";
+    const candidates = [",", "\t", ";", "，", "|"];
+    let best = ",";
+    let bestCount = -1;
+    for (const d of candidates) {
+      const c = csvSplitLine(first, d).length;
+      if (c > bestCount) { best = d; bestCount = c; }
+    }
+    return best;
+  }
+
+  function parseDelimited(text) {
+    text = text.replace(/^\uFEFF/, "");
+    const delimiter = detectDelimiter(text);
+    const lines = text.split(/\r?\n/).filter(x => x.trim().length > 0);
+    if (!lines.length) return [];
+    const headers = csvSplitLine(lines[0], delimiter).map(normalizeHeader);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = csvSplitLine(lines[i], delimiter);
+      const row = {};
+      headers.forEach((h, idx) => row[h || ("列" + (idx + 1))] = cells[idx] ?? "");
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function parseJson(text) {
+    const data = JSON.parse(text);
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.rows)) return data.rows;
+    if (data && Array.isArray(data.data)) return data.data;
+    throw new Error("JSON 需要是数组，或包含 rows/data 数组。");
+  }
+
+  async function parseFile(file) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (["xlsx", "xls"].includes(ext)) {
+      if (!window.XLSX) throw new Error("Excel 解析库未加载。请联网打开本工具，或先将 Excel 另存为 CSV 后导入。");
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    }
+    const text = await file.text();
+    if (ext === "json") return parseJson(text);
+    return parseDelimited(text);
+  }
+
+  function getColumns(rows) {
+    const set = new Set();
+    rows.slice(0, 50).forEach(r => Object.keys(r || {}).forEach(k => set.add(normalizeHeader(k))));
+    return Array.from(set).filter(Boolean);
+  }
+
+  function fillSelects(cols) {
+    const selects = [els.sourceCol, els.targetCol, els.amountCol, els.dateCol, els.memoCol];
+    selects.forEach(sel => {
+      sel.innerHTML = "";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = "不使用";
+      sel.appendChild(none);
+      cols.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function scoreColumn(name, patterns) {
+    const n = String(name).toLowerCase().replace(/\s/g, "");
+    let score = 0;
+    for (const p of patterns) {
+      const q = p.toLowerCase();
+      if (n === q) score += 20;
+      else if (n.includes(q)) score += 8;
+    }
+    return score;
+  }
+
+  function chooseCol(cols, patterns) {
+    let best = "", bestScore = 0;
+    for (const c of cols) {
+      const s = scoreColumn(c, patterns);
+      if (s > bestScore) { best = c; bestScore = s; }
+    }
+    return best;
+  }
+
+  function autoMap() {
+    const src = chooseCol(columns, ["付款方", "支付方", "转出方", "汇出方", "借方", "付款账户", "付款户名", "转出账户", "from", "source", "payer", "sender"]);
+    const tgt = chooseCol(columns, ["收款方", "接收方", "转入方", "汇入方", "贷方", "收款账户", "收款户名", "转入账户", "to", "target", "payee", "receiver"]);
+    const amt = chooseCol(columns, ["金额", "交易金额", "发生额", "转账金额", "借方金额", "贷方金额", "amount", "money", "value"]);
+    const date = chooseCol(columns, ["时间", "日期", "交易时间", "交易日期", "date", "time"]);
+    const memo = chooseCol(columns, ["备注", "摘要", "用途", "说明", "附言", "memo", "remark", "description"]);
+    if (src) els.sourceCol.value = src;
+    if (tgt) els.targetCol.value = tgt;
+    if (amt) els.amountCol.value = amt;
+    if (date) els.dateCol.value = date;
+    if (memo) els.memoCol.value = memo;
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function previewTable(rows) {
+    const cols = getColumns(rows).slice(0, 8);
+    const show = rows.slice(0, 8);
+    if (!rows.length) {
+      els.tablePreview.innerHTML = '<table><tbody><tr><td style="color:#667085;">暂无数据</td></tr></tbody></table>';
       return;
     }
+    let h = "<table><thead><tr>" + cols.map(c => `<th>${escapeHtml(c)}</th>`).join("") + "</tr></thead><tbody>";
+    h += show.map(r => "<tr>" + cols.map(c => `<td title="${escapeHtml(r[c] ?? "")}">${escapeHtml(r[c] ?? "")}</td>`).join("") + "</tr>").join("");
+    h += "</tbody></table>";
+    els.tablePreview.innerHTML = h;
   }
-  dragging=true;dragStart={x:e.clientX-panX,y:e.clientY-panY};
-});
-window.addEventListener('mousemove',e=>{
-  if(draggingNode){
-    const rect=$('svg').getBoundingClientRect();
-    draggingNode.x=(e.clientX-rect.left-panX)/scale-dragStart.x;
-    draggingNode.y=(e.clientY-rect.top-panY)/scale-dragStart.y;
-    nodeMoved=true;renderGraph(true);return;
+
+  function buildGraph() {
+    const sCol = els.sourceCol.value;
+    const tCol = els.targetCol.value;
+    const aCol = els.amountCol.value;
+    const minAmount = Number(els.minAmount.value || 0);
+
+    if (!sCol || !tCol || !aCol) throw new Error("请至少选择付款方、收款方、金额三列。");
+
+    const edgeMap = new Map();
+    const transactionCount = { total: 0, valid: 0 };
+
+    for (const r of rawRows) {
+      transactionCount.total++;
+      const source = normalizeName(r[sCol]);
+      const target = normalizeName(r[tCol]);
+      const amount = parseAmount(r[aCol]);
+      if (!source || !target || !amount || source === target || amount < minAmount) continue;
+      transactionCount.valid++;
+      const key = source + "→" + target;
+      if (!edgeMap.has(key)) edgeMap.set(key, { source, target, amount: 0, count: 0, memos: [] });
+      const e = edgeMap.get(key);
+      e.amount += amount;
+      e.count += 1;
+      if (els.memoCol.value && r[els.memoCol.value] && e.memos.length < 3) e.memos.push(String(r[els.memoCol.value]));
+    }
+
+    const edges = Array.from(edgeMap.values()).sort((a, b) => b.amount - a.amount);
+    const nodeMap = new Map();
+
+    for (const e of edges) {
+      if (!nodeMap.has(e.source)) nodeMap.set(e.source, { id: e.source, out: 0, in: 0, total: 0, layer: 0 });
+      if (!nodeMap.has(e.target)) nodeMap.set(e.target, { id: e.target, out: 0, in: 0, total: 0, layer: 0 });
+      nodeMap.get(e.source).out += e.amount;
+      nodeMap.get(e.target).in += e.amount;
+    }
+
+    const nodes = Array.from(nodeMap.values());
+    nodes.forEach(n => n.total = n.in + n.out);
+
+    const cycleEdges = findCycleEdges(nodes, edges);
+    edges.forEach(e => e.inCycle = cycleEdges.has(e.source + "→" + e.target));
+
+    assignLayers(nodes, edges);
+    edges.forEach(e => {
+      const s = nodeMap.get(e.source);
+      const t = nodeMap.get(e.target);
+      e.layer = Math.min(s ? s.layer : 0, t ? t.layer : 0);
+      e.crossLayer = `${s ? s.layer : 0}→${t ? t.layer : 0}`;
+    });
+
+    return { nodes, edges, transactionCount };
   }
-  if(dragging){panX=e.clientX-dragStart.x;panY=e.clientY-dragStart.y;renderGraph(true)}
-});
-window.addEventListener('mouseup',()=>{
-  dragging=false;
-  if(draggingNode&&nodeMoved)toast('节点位置已调整');
-  draggingNode=null;nodeMoved=false;
-});
-$('svg').addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.35,Math.min(3,scale*(e.deltaY<0?1.1:.9)));renderGraph(true)},{passive:false});
-window.addEventListener('resize',()=>graphState&&renderGraph(true));
+
+  function findCycleEdges(nodes, edges) {
+    const adj = new Map();
+    nodes.forEach(n => adj.set(n.id, []));
+    edges.forEach(e => adj.get(e.source).push(e.target));
+
+    const cycleSet = new Set();
+
+    function hasPath(start, target, blockedEdgeKey) {
+      const stack = [start];
+      const seen = new Set();
+      while (stack.length) {
+        const cur = stack.pop();
+        if (cur === target) return true;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+        for (const nxt of adj.get(cur) || []) {
+          const k = cur + "→" + nxt;
+          if (k === blockedEdgeKey) continue;
+          if (!seen.has(nxt)) stack.push(nxt);
+        }
+      }
+      return false;
+    }
+
+    for (const e of edges) {
+      const k = e.source + "→" + e.target;
+      if (hasPath(e.target, e.source, k)) cycleSet.add(k);
+    }
+    return cycleSet;
+  }
+
+  function assignLayers(nodes, edges) {
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const indeg = new Map(nodes.map(n => [n.id, 0]));
+    const adj = new Map(nodes.map(n => [n.id, []]));
+
+    edges.forEach(e => {
+      adj.get(e.source).push(e.target);
+      indeg.set(e.target, (indeg.get(e.target) || 0) + 1);
+    });
+
+    let starts = nodes.filter(n => (indeg.get(n.id) || 0) === 0);
+    if (!starts.length && nodes.length) {
+      const sorted = nodes.slice().sort((a, b) => (b.out - b.in) - (a.out - a.in));
+      starts = [sorted[0]];
+    }
+
+    nodes.forEach(n => n.layer = Number.POSITIVE_INFINITY);
+    starts.forEach(n => n.layer = 0);
+
+    const q = starts.map(n => n.id);
+    while (q.length) {
+      const cur = q.shift();
+      const base = nodeMap.get(cur).layer;
+      for (const nxt of adj.get(cur) || []) {
+        const target = nodeMap.get(nxt);
+        if (base + 1 < target.layer) {
+          target.layer = base + 1;
+          q.push(nxt);
+        }
+      }
+    }
+
+    nodes.forEach(n => {
+      if (!isFinite(n.layer)) n.layer = 0;
+      n.layer = Math.min(n.layer, 8);
+    });
+
+    // 为纯闭环或复杂交叉场景补一轮净流向排序，避免所有节点完全挤在同一层。
+    const allSame = new Set(nodes.map(n => n.layer)).size <= 1 && nodes.length > 2;
+    if (allSame) {
+      const sorted = nodes.slice().sort((a, b) => (b.out - b.in) - (a.out - a.in));
+      sorted.forEach((n, i) => n.layer = Math.min(i, 4));
+    }
+  }
+
+  function autoLayoutGraph(graph, preserveManual = false) {
+    const oldPos = new Map();
+    if (preserveManual && currentGraph) {
+      currentGraph.nodes.forEach(n => oldPos.set(n.id, { x: n.x, y: n.y, manual: n.manual }));
+    }
+
+    const width = Math.max(1180, 760 + graph.nodes.length * 60);
+    const maxLayer = Math.max(...graph.nodes.map(n => n.layer), 0);
+    const layers = groupBy(graph.nodes, n => n.layer);
+    const largestLayerSize = Math.max(...Array.from(layers.values()).map(a => a.length), 1);
+    const height = Math.max(720, 360 + largestLayerSize * 120);
+
+    els.svg.setAttribute("width", width);
+    els.svg.setAttribute("height", height);
+
+    graph.nodes.forEach(n => {
+      const old = oldPos.get(n.id);
+      if (old && old.manual) {
+        n.x = old.x; n.y = old.y; n.manual = true;
+      }
+    });
+
+    if (els.layoutMode.value === "circle") {
+      const sorted = graph.nodes.slice().sort((a,b)=>b.total-a.total);
+      const cx = width / 2;
+      const cy = height / 2 + 30;
+      const r = Math.min(width, height) * 0.35;
+      sorted.forEach((n, i) => {
+        if (n.manual) return;
+        const angle = -Math.PI / 2 + 2 * Math.PI * i / sorted.length;
+        n.x = cx + r * Math.cos(angle);
+        n.y = cy + r * Math.sin(angle);
+      });
+      if (sorted.length === 1 && !sorted[0].manual) { sorted[0].x = cx; sorted[0].y = cy; }
+    } else {
+      const direction = els.layerDirection.value;
+      const marginX = 120;
+      const marginY = 140;
+      const sortedLayers = Array.from(layers.entries()).sort((a,b)=>a[0]-b[0]);
+
+      for (const [layer, arr] of sortedLayers) {
+        arr.sort((a,b) => b.total - a.total);
+        arr.forEach((n, i) => {
+          if (n.manual) return;
+          const slot = (i + 1) / (arr.length + 1);
+          if (direction === "tb") {
+            n.x = marginX + (width - marginX * 2) * slot;
+            n.y = marginY + (height - marginY * 2) * (maxLayer === 0 ? 0.5 : layer / Math.max(maxLayer, 1));
+          } else {
+            n.x = marginX + (width - marginX * 2) * (maxLayer === 0 ? 0.5 : layer / Math.max(maxLayer, 1));
+            n.y = marginY + (height - marginY * 2) * slot;
+          }
+        });
+      }
+    }
+
+    const maxTotal = Math.max(...graph.nodes.map(n => n.total), 1);
+    graph.nodes.forEach(n => n.r = 24 + 26 * Math.sqrt(n.total / maxTotal));
+  }
+
+  function groupBy(arr, fn) {
+    const m = new Map();
+    for (const x of arr) {
+      const k = fn(x);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(x);
+    }
+    return m;
+  }
+
+  function edgeColor(e, maxAmount) {
+    if (els.colorMode.value === "cycle" && e.inCycle) return "#ef4444";
+    if (els.colorMode.value === "amount") {
+      const ratio = e.amount / Math.max(maxAmount, 1);
+      if (ratio > .66) return "#dc2626";
+      if (ratio > .33) return "#f59e0b";
+      return "#2563eb";
+    }
+    if (e.inCycle) return "#ef4444";
+    return layerColors[e.layer % layerColors.length];
+  }
+
+  function nodeColor(n) {
+    return layerColors[n.layer % layerColors.length];
+  }
+
+  function draw(preserveManual = false) {
+    let graph;
+    try {
+      graph = buildGraph();
+    } catch (err) {
+      setStatus(err.message, "err");
+      return;
+    }
+
+    autoLayoutGraph(graph, preserveManual);
+    currentGraph = graph;
+    renderGraph();
+
+    const unit = els.unitName.value || "元";
+    const totalAmount = graph.edges.reduce((s, e) => s + e.amount, 0);
+    const cycleCount = graph.edges.filter(e => e.inCycle).length;
+    const maxLayer = Math.max(...graph.nodes.map(n => n.layer), 0);
+    els.graphTitle.textContent = els.chartTitle.value || "资金流向闭环图";
+    els.graphSub.textContent = `${graph.nodes.length} 个主体，${graph.edges.length} 条合并流向，${maxLayer + 1} 个层级，累计金额 ${formatAmount(totalAmount)} ${unit}，闭环相关流向 ${cycleCount} 条`;
+    els.empty.style.display = graph.edges.length ? "none" : "grid";
+
+    setStatus(`绘制完成。\n有效交易：${graph.transactionCount.valid}/${graph.transactionCount.total} 笔。\n已按资金流层级分色；节点可拖拽调整位置。`, "ok");
+    [els.exportSvg, els.exportPng, els.exportHtml].forEach(b => b.disabled = !graph.edges.length);
+    els.resetLayout.disabled = !graph.edges.length;
+  }
+
+  function renderGraph() {
+    const graph = currentGraph;
+    if (!graph) return;
+
+    const svg = els.svg;
+    const width = Number(svg.getAttribute("width"));
+    const height = Number(svg.getAttribute("height"));
+    svg.innerHTML = "";
+
+    const defs = document.createElementNS(ns, "defs");
+    defs.innerHTML = `
+      <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#101828" flood-opacity="0.18"/>
+      </filter>
+    `;
+    layerColors.forEach((c, i) => {
+      defs.innerHTML += `
+        <marker id="arrow-${i}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+          <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5 z" fill="${c}"></path>
+        </marker>`;
+    });
+    defs.innerHTML += `
+      <marker id="arrow-cycle" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+        <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5 z" fill="#ef4444"></path>
+      </marker>
+      <marker id="arrow-amount-low" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+        <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5 z" fill="#2563eb"></path>
+      </marker>
+      <marker id="arrow-amount-mid" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+        <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5 z" fill="#f59e0b"></path>
+      </marker>
+      <marker id="arrow-amount-high" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+        <path d="M 1.5 1.5 L 8.5 5 L 1.5 8.5 z" fill="#dc2626"></path>
+      </marker>`;
+    svg.appendChild(defs);
+
+    drawLayerBackgrounds(svg, graph, width, height);
+
+    const title = document.createElementNS(ns, "text");
+    title.setAttribute("x", 32);
+    title.setAttribute("y", 46);
+    title.setAttribute("font-size", 24);
+    title.setAttribute("font-weight", 800);
+    title.setAttribute("fill", "#162033");
+    title.textContent = els.chartTitle.value || "资金流向闭环图";
+    svg.appendChild(title);
+
+    const sub = document.createElementNS(ns, "text");
+    sub.setAttribute("x", 32);
+    sub.setAttribute("y", 74);
+    sub.setAttribute("font-size", 13);
+    sub.setAttribute("fill", "#667085");
+    sub.textContent = els.graphSub.textContent || "";
+    svg.appendChild(sub);
+
+    const nodeMap = new Map(graph.nodes.map(n => [n.id, n]));
+    const maxAmount = Math.max(...graph.edges.map(e => e.amount), 1);
+
+    const edgeGroup = document.createElementNS(ns, "g");
+    edgeGroup.setAttribute("class", "edges");
+    svg.appendChild(edgeGroup);
+
+    graph.edges.forEach((e, idx) => {
+      const ep = edgePath(e, nodeMap, idx);
+      const color = edgeColor(e, maxAmount);
+      const p = document.createElementNS(ns, "path");
+      p.setAttribute("d", ep.d);
+      p.setAttribute("class", "edge" + (e.inCycle ? " loop" : ""));
+      p.setAttribute("stroke", color);
+      p.setAttribute("stroke-width", (1.4 + 6 * Math.sqrt(e.amount / maxAmount)).toFixed(2));
+      p.setAttribute("marker-end", markerForEdge(e, maxAmount));
+      p.dataset.edgeKey = e.source + "→" + e.target;
+
+      const titleNode = document.createElementNS(ns, "title");
+      titleNode.textContent = `${e.source} → ${e.target}\n层级：${e.crossLayer}\n金额：${formatAmount(e.amount)} ${els.unitName.value || "元"}\n交易笔数：${e.count}${e.inCycle ? "\n提示：该流向处在可能闭环路径中" : ""}`;
+      p.appendChild(titleNode);
+      edgeGroup.appendChild(p);
+
+      const label = document.createElementNS(ns, "text");
+      label.setAttribute("class", "edge-label");
+      label.setAttribute("x", ep.mx);
+      label.setAttribute("y", ep.my);
+      label.setAttribute("text-anchor", "middle");
+      label.dataset.labelKey = e.source + "→" + e.target;
+      label.textContent = formatAmount(e.amount) + (els.unitName.value || "元");
+      edgeGroup.appendChild(label);
+
+      if (e.inCycle) {
+        const badge = document.createElementNS(ns, "text");
+        badge.setAttribute("class", "cycle-badge");
+        badge.setAttribute("x", ep.mx);
+        badge.setAttribute("y", ep.my - 17);
+        badge.setAttribute("text-anchor", "middle");
+        badge.dataset.badgeKey = e.source + "→" + e.target;
+        badge.textContent = "闭环";
+        edgeGroup.appendChild(badge);
+      }
+    });
+
+    const nodeGroup = document.createElementNS(ns, "g");
+    nodeGroup.setAttribute("class", "nodes");
+    svg.appendChild(nodeGroup);
+
+    graph.nodes.forEach(n => {
+      const g = document.createElementNS(ns, "g");
+      g.setAttribute("class", "node");
+      g.setAttribute("transform", `translate(${n.x},${n.y})`);
+      g.dataset.nodeId = n.id;
+
+      const c = document.createElementNS(ns, "circle");
+      c.setAttribute("r", n.r);
+      c.setAttribute("fill", "#ffffff");
+      c.setAttribute("stroke", nodeColor(n));
+      c.setAttribute("stroke-width", 3);
+      c.setAttribute("filter", "url(#softShadow)");
+      g.appendChild(c);
+
+      const ring = document.createElementNS(ns, "circle");
+      ring.setAttribute("r", Math.max(8, n.r - 8));
+      ring.setAttribute("fill", hexToRgba(nodeColor(n), .12));
+      ring.setAttribute("stroke", "none");
+      g.appendChild(ring);
+
+      const t = document.createElementNS(ns, "text");
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("y", -2);
+      t.textContent = truncate(n.id, 12);
+      g.appendChild(t);
+
+      const st = document.createElementNS(ns, "text");
+      st.setAttribute("class", "sub");
+      st.setAttribute("text-anchor", "middle");
+      st.setAttribute("y", 17);
+      st.textContent = `L${n.layer + 1} 入${formatShort(n.in)} / 出${formatShort(n.out)}`;
+      g.appendChild(st);
+
+      const titleNode = document.createElementNS(ns, "title");
+      titleNode.textContent = `${n.id}\n层级：第 ${n.layer + 1} 层\n流入：${formatAmount(n.in)} ${els.unitName.value || "元"}\n流出：${formatAmount(n.out)} ${els.unitName.value || "元"}\n拖拽节点可手动调整位置`;
+      g.appendChild(titleNode);
+
+      g.addEventListener("pointerdown", onNodePointerDown);
+      nodeGroup.appendChild(g);
+    });
+
+    updateLegend(graph);
+  }
+
+  function drawLayerBackgrounds(svg, graph, width, height) {
+    if (els.layoutMode.value !== "layer") return;
+
+    const maxLayer = Math.max(...graph.nodes.map(n => n.layer), 0);
+    const layerCount = maxLayer + 1;
+    const direction = els.layerDirection.value;
+    const marginX = 80;
+    const marginY = 104;
+
+    const group = document.createElementNS(ns, "g");
+    group.setAttribute("class", "layer-bgs");
+    svg.appendChild(group);
+
+    for (let i = 0; i < layerCount; i++) {
+      const rect = document.createElementNS(ns, "rect");
+      rect.setAttribute("class", "layer-bg");
+      const color = layerColors[i % layerColors.length];
+      rect.setAttribute("fill", hexToRgba(color, .045));
+      rect.setAttribute("stroke", hexToRgba(color, .35));
+
+      if (direction === "tb") {
+        const h = (height - marginY - 40) / layerCount;
+        rect.setAttribute("x", marginX);
+        rect.setAttribute("y", marginY + i * h);
+        rect.setAttribute("width", width - marginX * 2);
+        rect.setAttribute("height", h - 8);
+      } else {
+        const w = (width - marginX * 2) / layerCount;
+        rect.setAttribute("x", marginX + i * w);
+        rect.setAttribute("y", marginY);
+        rect.setAttribute("width", w - 8);
+        rect.setAttribute("height", height - marginY - 60);
+      }
+      group.appendChild(rect);
+
+      const label = document.createElementNS(ns, "text");
+      label.setAttribute("class", "layer-title");
+      label.textContent = `第 ${i + 1} 层`;
+      if (direction === "tb") {
+        label.setAttribute("x", marginX + 12);
+        label.setAttribute("y", marginY + i * ((height - marginY - 40) / layerCount) + 22);
+      } else {
+        label.setAttribute("x", marginX + i * ((width - marginX * 2) / layerCount) + 12);
+        label.setAttribute("y", marginY + 22);
+      }
+      group.appendChild(label);
+    }
+  }
+
+  function markerForEdge(e, maxAmount) {
+    if (els.colorMode.value === "cycle" && e.inCycle) return "url(#arrow-cycle)";
+    if (els.colorMode.value === "amount") {
+      const ratio = e.amount / Math.max(maxAmount, 1);
+      if (ratio > .66) return "url(#arrow-amount-high)";
+      if (ratio > .33) return "url(#arrow-amount-mid)";
+      return "url(#arrow-amount-low)";
+    }
+    if (e.inCycle) return "url(#arrow-cycle)";
+    return `url(#arrow-${e.layer % layerColors.length})`;
+  }
+
+  function edgePath(e, nodeMap, idx) {
+    const s = nodeMap.get(e.source);
+    const t = nodeMap.get(e.target);
+    const dx = t.x - s.x, dy = t.y - s.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const sx = s.x + dx / dist * (s.r + 4);
+    const sy = s.y + dy / dist * (s.r + 4);
+    const tx = t.x - dx / dist * (t.r + 12);
+    const ty = t.y - dy / dist * (t.r + 12);
+
+    const mx = (sx + tx) / 2;
+    const my = (sy + ty) / 2;
+
+    let curve = 0.14 + (idx % 5) * 0.025;
+    let sign = idx % 2 === 0 ? 1 : -1;
+    if (Math.abs(s.layer - t.layer) > 1) curve += 0.08;
+    if (s.layer > t.layer) sign *= -1;
+
+    const cx = mx - dy * curve * sign;
+    const cy = my + dx * curve * sign;
+    return {
+      d: `M ${sx.toFixed(2)} ${sy.toFixed(2)} Q ${cx.toFixed(2)} ${cy.toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)}`,
+      mx: cx,
+      my: cy
+    };
+  }
+
+  function onNodePointerDown(evt) {
+    if (!currentGraph) return;
+    const g = evt.currentTarget;
+    const id = g.dataset.nodeId;
+    const node = currentGraph.nodes.find(n => n.id === id);
+    if (!node) return;
+
+    evt.preventDefault();
+    g.setPointerCapture(evt.pointerId);
+    g.classList.add("dragging");
+
+    const p = svgPoint(evt);
+    dragging = {
+      id,
+      pointerId: evt.pointerId,
+      offsetX: p.x - node.x,
+      offsetY: p.y - node.y,
+      element: g
+    };
+
+    g.addEventListener("pointermove", onNodePointerMove);
+    g.addEventListener("pointerup", onNodePointerUp);
+    g.addEventListener("pointercancel", onNodePointerUp);
+  }
+
+  function onNodePointerMove(evt) {
+    if (!dragging || evt.pointerId !== dragging.pointerId || !currentGraph) return;
+    const node = currentGraph.nodes.find(n => n.id === dragging.id);
+    if (!node) return;
+
+    const p = svgPoint(evt);
+    node.x = clamp(p.x - dragging.offsetX, 40, Number(els.svg.getAttribute("width")) - 40);
+    node.y = clamp(p.y - dragging.offsetY, 90, Number(els.svg.getAttribute("height")) - 40);
+    node.manual = true;
+
+    dragging.element.setAttribute("transform", `translate(${node.x},${node.y})`);
+    updateConnectedEdges(node.id);
+  }
+
+  function onNodePointerUp(evt) {
+    if (!dragging || evt.pointerId !== dragging.pointerId) return;
+    dragging.element.classList.remove("dragging");
+    dragging.element.releasePointerCapture(evt.pointerId);
+    dragging.element.removeEventListener("pointermove", onNodePointerMove);
+    dragging.element.removeEventListener("pointerup", onNodePointerUp);
+    dragging.element.removeEventListener("pointercancel", onNodePointerUp);
+    dragging = null;
+  }
+
+  function updateConnectedEdges(nodeId) {
+    const graph = currentGraph;
+    const nodeMap = new Map(graph.nodes.map(n => [n.id, n]));
+    graph.edges.forEach((e, idx) => {
+      if (e.source !== nodeId && e.target !== nodeId) return;
+      const key = e.source + "→" + e.target;
+      const ep = edgePath(e, nodeMap, idx);
+      const path = els.svg.querySelector(`path[data-edge-key="${cssEscape(key)}"]`);
+      const label = els.svg.querySelector(`text[data-label-key="${cssEscape(key)}"]`);
+      const badge = els.svg.querySelector(`text[data-badge-key="${cssEscape(key)}"]`);
+      if (path) path.setAttribute("d", ep.d);
+      if (label) { label.setAttribute("x", ep.mx); label.setAttribute("y", ep.my); }
+      if (badge) { badge.setAttribute("x", ep.mx); badge.setAttribute("y", ep.my - 17); }
+    });
+  }
+
+  function svgPoint(evt) {
+    const pt = els.svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    return pt.matrixTransform(els.svg.getScreenCTM().inverse());
+  }
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/["\\]/g, "\\$&");
+  }
+
+  function hexToRgba(hex, alpha) {
+    const v = hex.replace("#", "");
+    const r = parseInt(v.slice(0, 2), 16);
+    const g = parseInt(v.slice(2, 4), 16);
+    const b = parseInt(v.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function updateLegend(graph) {
+    const maxLayer = Math.max(...graph.nodes.map(n => n.layer), 0);
+    const items = [];
+    const shown = Math.min(maxLayer + 1, 6);
+    for (let i = 0; i < shown; i++) {
+      items.push(`<span><i class="dot" style="background:${layerColors[i % layerColors.length]};"></i>第 ${i + 1} 层资金流</span>`);
+    }
+    if (maxLayer + 1 > shown) items.push(`<span>更多层级循环使用颜色</span>`);
+    items.push(`<span><i class="dot" style="background:#ef4444;"></i>闭环相关流向</span>`);
+    items.push(`<span>箭头粗细表示累计金额大小；节点可拖拽</span>`);
+    els.legend.innerHTML = items.join("");
+  }
+
+  function formatAmount(n) {
+    if (!isFinite(n)) return "0";
+    return Number(n).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+  }
+
+  function formatShort(n) {
+    if (n >= 100000000) return (n / 100000000).toFixed(1) + "亿";
+    if (n >= 10000) return (n / 10000).toFixed(1) + "万";
+    return Math.round(n).toString();
+  }
+
+  function truncate(s, len) {
+    s = String(s);
+    return s.length > len ? s.slice(0, len - 1) + "…" : s;
+  }
+
+  function loadRows(rows, sourceName = "数据") {
+    rawRows = rows.filter(r => r && Object.keys(r).length);
+    columns = getColumns(rawRows);
+    if (!rawRows.length || !columns.length) {
+      setStatus("文件中没有识别到有效表格数据。", "err");
+      return;
+    }
+    fillSelects(columns);
+    autoMap();
+    previewTable(rawRows);
+    els.drawBtn.disabled = false;
+    els.autoMapBtn.disabled = false;
+    setStatus(`已导入：${sourceName}\n记录数：${rawRows.length} 行；字段数：${columns.length} 列。`, "ok");
+    draw(false);
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    try {
+      setStatus("正在解析文件……");
+      const rows = await parseFile(file);
+      loadRows(rows, file.name);
+    } catch (err) {
+      console.error(err);
+      setStatus("导入失败：" + err.message, "err");
+    }
+  }
+
+  function download(name, content, mime) {
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mime || "application/octet-stream" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 300);
+  }
+
+  function svgString() {
+    const clone = els.svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.insertAdjacentHTML("afterbegin", `<style>
+      .layer-bg{fill-opacity:1;stroke-dasharray:6 8}.layer-title{font-family:Microsoft YaHei,Arial,sans-serif;font-size:12px;fill:#667085;font-weight:700}
+      .node text{font-family:Microsoft YaHei,Arial,sans-serif;font-size:13px;font-weight:800;fill:#1e293b;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+      .node .sub{font-size:11px;font-weight:500;fill:#64748b}
+      .edge-label{font-family:Microsoft YaHei,Arial,sans-serif;font-size:11px;fill:#344054;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+      .edge{fill:none;stroke-linecap:round;opacity:.78}.edge.loop{stroke-dasharray:8 6}
+      .cycle-badge{font-family:Microsoft YaHei,Arial,sans-serif;font-size:11px;font-weight:800;fill:#b42318;paint-order:stroke;stroke:#fff;stroke-width:3px}
+    </style>`);
+    return new XMLSerializer().serializeToString(clone);
+  }
+
+  function exportSvg() {
+    download("资金流向闭环图_层级分色版.svg", svgString(), "image/svg+xml;charset=utf-8");
+  }
+
+  function exportPng() {
+    const s = svgString();
+    const svgBlob = new Blob([s], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Number(els.svg.getAttribute("width"));
+      canvas.height = Number(els.svg.getAttribute("height"));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(blob => {
+        download("资金流向闭环图_层级分色版.png", blob, "image/png");
+        URL.revokeObjectURL(url);
+      }, "image/png", 1);
+    };
+    img.onerror = () => {
+      setStatus("PNG 导出失败，可先导出 SVG。", "err");
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  function exportHtml() {
+    const title = escapeHtml(els.chartTitle.value || "资金流向闭环图");
+    const content = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${title}</title><style>body{margin:0;padding:24px;background:#f6f8fb;font-family:Microsoft YaHei,Arial,sans-serif}main{background:white;border-radius:18px;padding:20px;box-shadow:0 12px 30px rgba(16,24,40,.08);overflow:auto}h1{font-size:24px;margin:0 0 12px}.note{color:#667085;font-size:13px;margin-bottom:14px}</style></head><body><main><h1>${title}</h1><div class="note">${escapeHtml(els.graphSub.textContent)}</div>${svgString()}</main></body></html>`;
+    download("资金流向闭环图_层级分色版.html", content, "text/html;charset=utf-8");
+  }
+
+  function clearAll() {
+    rawRows = [];
+    columns = [];
+    currentGraph = null;
+    [els.sourceCol, els.targetCol, els.amountCol, els.dateCol, els.memoCol].forEach(s => s.innerHTML = "");
+    els.svg.innerHTML = "";
+    els.empty.style.display = "grid";
+    els.graphSub.textContent = "导入文件后自动生成";
+    els.tablePreview.innerHTML = '<table><tbody><tr><td style="color:#667085;">暂无数据</td></tr></tbody></table>';
+    [els.drawBtn, els.autoMapBtn, els.exportSvg, els.exportPng, els.exportHtml, els.resetLayout].forEach(b => b.disabled = true);
+    setStatus("已清空。");
+  }
+
+  function downloadTemplate() {
+    const csv = "\uFEFF交易时间,付款方,收款方,金额,备注\n2026-01-01,甲公司,乙公司,100000,采购款\n2026-01-02,乙公司,丙公司,80000,服务费\n2026-01-03,丙公司,甲公司,50000,咨询费\n";
+    download("资金闭环图导入模板.csv", csv, "text/csv;charset=utf-8");
+  }
+
+  els.dropzone.addEventListener("click", () => els.fileInput.click());
+  els.fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
+  els.dropzone.addEventListener("dragover", e => { e.preventDefault(); els.dropzone.classList.add("dragover"); });
+  els.dropzone.addEventListener("dragleave", () => els.dropzone.classList.remove("dragover"));
+  els.dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    els.dropzone.classList.remove("dragover");
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  els.loadSample.addEventListener("click", () => loadRows(sampleRows, "示例数据"));
+  els.downloadTemplate.addEventListener("click", downloadTemplate);
+  els.drawBtn.addEventListener("click", () => draw(true));
+  els.autoMapBtn.addEventListener("click", () => { autoMap(); draw(true); });
+  els.resetLayout.addEventListener("click", () => {
+    if (!currentGraph) return;
+    currentGraph.nodes.forEach(n => n.manual = false);
+    draw(false);
+  });
+
+  [els.minAmount, els.layoutMode, els.colorMode, els.layerDirection, els.unitName].forEach(el => {
+    el.addEventListener("change", () => { if (rawRows.length) draw(true); });
+  });
+  els.chartTitle.addEventListener("input", () => { els.graphTitle.textContent = els.chartTitle.value || "资金流向闭环图"; if (rawRows.length) renderGraph(); });
+
+  els.exportSvg.addEventListener("click", exportSvg);
+  els.exportPng.addEventListener("click", exportPng);
+  els.exportHtml.addEventListener("click", exportHtml);
+  els.clearBtn.addEventListener("click", clearAll);
+
+  fillSelects([]);
+})();
 </script>
 </body>
 </html>
+
