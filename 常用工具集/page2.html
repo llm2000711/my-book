@@ -1,1 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>资金闭环图绘制工具</title>
+<style>
+  :root{
+    --bg:#050816;--panel:rgba(13,20,42,.88);--text:#edf7ff;--muted:#91a6c7;--line:rgba(121,157,255,.24);
+    --primary:#00e5ff;--primary2:#8b5cf6;--danger:#ff2e88;--ok:#28f0a3;--shadow:0 16px 48px rgba(0,229,255,.10),0 0 28px rgba(139,92,246,.08)
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--text);
+  background:
+    radial-gradient(circle at 15% 20%,rgba(0,229,255,.13),transparent 28%),
+    radial-gradient(circle at 85% 15%,rgba(139,92,246,.18),transparent 32%),
+    radial-gradient(circle at 70% 85%,rgba(255,46,136,.10),transparent 28%),var(--bg)}
+  header{height:68px;background:linear-gradient(90deg,rgba(5,10,27,.96),rgba(20,12,48,.96));color:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+  header h1{font-size:20px;margin:0}.sub{font-size:12px;color:#b8c3dc;margin-top:4px}
+  .top-actions{display:flex;gap:8px}
+  button,.btn{border:1px solid rgba(94,168,255,.22);border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;background:rgba(25,39,74,.86);color:#dcecff;transition:.2s;box-shadow:inset 0 0 18px rgba(0,229,255,.03)}
+  button:hover,.btn:hover{transform:translateY(-1px)}
+  .primary{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#04101c;font-weight:700;box-shadow:0 0 20px rgba(0,229,255,.25)}.danger{background:#fff0f0;color:#c92a2a}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;height:calc(100vh - 68px)}
+  .panel{background:var(--panel);border:1px solid rgba(90,170,255,.18);backdrop-filter:blur(16px);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .sidebar{display:flex;flex-direction:column;min-height:0}
+  .section{padding:16px;border-bottom:1px solid rgba(129,159,222,.12)}
+  .section h3{font-size:14px;margin:0 0 12px}
+  .drop{border:2px dashed rgba(0,229,255,.48);border-radius:12px;padding:24px 14px;text-align:center;background:linear-gradient(135deg,rgba(0,229,255,.05),rgba(139,92,246,.08));cursor:pointer;box-shadow:inset 0 0 28px rgba(0,229,255,.05)}
+  .drop.drag{border-color:#ff2e88;background:rgba(255,46,136,.10);box-shadow:0 0 28px rgba(255,46,136,.22)}
+  .drop strong{display:block;margin-bottom:7px}.drop small{color:var(--muted);line-height:1.6}
+  input[type=file]{display:none}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{margin-bottom:9px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  select,input[type=text],input[type=number]{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px;background:#0b1329;color:var(--text)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:linear-gradient(145deg,rgba(21,35,72,.88),rgba(23,18,55,.92));border:1px solid rgba(0,229,255,.14);border-radius:9px;padding:10px;text-align:center}
+  .stat b{font-size:18px;display:block}.stat span{font-size:11px;color:var(--muted)}
+  .hint{font-size:12px;line-height:1.55;color:var(--muted)}
+  .table-wrap{overflow:auto;flex:1;min-height:110px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{padding:8px;border-bottom:1px solid rgba(129,159,222,.12);text-align:left;white-space:nowrap}
+  th{position:sticky;top:0;background:#101a38;z-index:1;color:#9eeeff}
+  .main{display:flex;flex-direction:column;min-width:0}
+  .toolbar{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid rgba(129,159,222,.12)}
+  .toolbar-left,.toolbar-right{display:flex;gap:8px;align-items:center}
+  .canvas-wrap{position:relative;flex:1;overflow:hidden;background:
+    linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(139,92,246,.035) 1px,transparent 1px),
+    radial-gradient(circle at 50% 50%,rgba(36,54,101,.42),rgba(4,8,22,.96));
+    background-size:24px 24px,24px 24px,100% 100%}
+  #svg{width:100%;height:100%;display:block;user-select:none}
+  .legend{position:absolute;left:14px;bottom:14px;background:rgba(8,16,35,.90);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  .legend i{display:inline-block;width:24px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .cycle-list{position:absolute;right:14px;top:14px;max-width:320px;max-height:180px;overflow:auto;background:rgba(8,16,35,.92);border:1px solid var(--line);border-radius:10px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,.08);font-size:12px}
+  .cycle-list h4{margin:0 0 8px}.cycle-item{padding:6px 7px;background:rgba(255,46,136,.12);color:#ff9ac7;border:1px solid rgba(255,46,136,.22);border-radius:6px;margin-top:5px}
+  .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:#8994a8;text-align:center}
+  .empty b{display:block;font-size:17px;color:#596579;margin-bottom:8px}
+  .node text{font-size:12px;pointer-events:none}.edge-label{font-size:11px;fill:#475467;paint-order:stroke;stroke:white;stroke-width:4px}
+  .toast{position:fixed;right:20px;bottom:20px;background:#111827;color:#fff;padding:10px 15px;border-radius:9px;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1;transform:translateY(0)}
+  .modal{position:fixed;inset:0;background:rgba(8,15,30,.48);display:none;align-items:center;justify-content:center;z-index:100}
+  .modal.open{display:flex}.modal-card{width:min(720px,92vw);max-height:80vh;overflow:auto;background:white;border-radius:14px;padding:20px}
+  pre{background:#f6f8fc;padding:12px;border-radius:8px;overflow:auto;font-size:12px}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;height:auto}.sidebar{min-height:600px}.main{height:75vh}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>资金闭环图绘制工具</h1><div class="sub">导入交易明细，自动生成可拖拽的霓虹资金流向图并识别闭环</div></div>
+  <div class="top-actions">
+    <button id="sampleBtn">加载示例</button>
+    <button id="helpBtn">格式说明</button>
+    <button class="primary" id="exportHtmlBtn">导出 HTML</button>
+  </div>
+</header>
 
+<div class="layout">
+  <aside class="panel sidebar">
+    <div class="section">
+      <h3>1. 导入文件</h3>
+      <div class="drop" id="drop">
+        <strong>点击或拖拽文件到这里</strong>
+        <small>支持 CSV、TXT、JSON、XLSX、XLS<br>Excel 解析需要联网加载组件</small>
+      </div>
+      <input id="fileInput" type="file" accept=".csv,.txt,.json,.xlsx,.xls" />
+    </div>
+
+    <div class="section">
+      <h3>2. 字段映射</h3>
+      <div class="row">
+        <div class="field"><label>付款方 / 来源</label><select id="sourceCol"></select></div>
+        <div class="field"><label>收款方 / 去向</label><select id="targetCol"></select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>金额</label><select id="amountCol"></select></div>
+        <div class="field"><label>日期（可选）</label><select id="dateCol"></select></div>
+      </div>
+      <div class="field"><label>备注（可选）</label><select id="remarkCol"></select></div>
+      <button class="primary" style="width:100%" id="drawBtn">自动绘制资金流向图</button>
+    </div>
+
+    <div class="section">
+      <h3>数据概览</h3>
+      <div class="stats">
+        <div class="stat"><b id="txCount">0</b><span>交易笔数</span></div>
+        <div class="stat"><b id="nodeCount">0</b><span>主体数量</span></div>
+        <div class="stat"><b id="cycleCount">0</b><span>识别闭环</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>绘图设置</h3>
+      <div class="row">
+        <div class="field"><label>布局</label><select id="layoutMode"><option value="circle">环形布局</option><option value="layer">分层布局</option></select></div>
+        <div class="field"><label>聚合</label><select id="aggregate"><option value="yes">同主体合并</option><option value="no">逐笔显示</option></select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>最小金额</label><input id="minAmount" type="number" value="0" step="0.01"></div>
+        <div class="field"><label>节点搜索</label><input id="searchNode" type="text" placeholder="输入名称"></div>
+      </div>
+      <div class="hint">红色连线表示至少属于一个资金闭环；线条越粗，累计金额越大。</div>
+    </div>
+
+    <div class="table-wrap"><table id="dataTable"><thead></thead><tbody></tbody></table></div>
+  </aside>
+
+  <main class="panel main">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button id="zoomIn">放大</button><button id="zoomOut">缩小</button><button id="resetView">重置视图</button>
+      </div>
+      <div class="toolbar-right">
+        <button id="exportSvg">导出 SVG</button><button id="exportPng">导出 PNG</button>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="empty" id="empty"><div><b>尚未生成资金流向图</b>请先导入数据，或点击“加载示例”</div></div>
+      <div class="legend" id="legend" style="display:none"><div><i style="background:#718096"></i>普通资金流</div><div style="margin-top:5px"><i style="background:#e5484d"></i>闭环资金流</div></div>
+      <div class="cycle-list" id="cyclePanel" style="display:none"><h4>识别到的资金闭环</h4><div id="cycleItems"></div></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="modal-card">
+  <h2 style="margin-top:0">文件格式说明</h2>
+  <p>建议使用以下字段。导入后也可以手动映射列名：</p>
+  <pre>付款方,收款方,金额,日期,备注
+甲公司,乙公司,100000,2026-01-02,采购款
+乙公司,丙公司,85000,2026-01-03,服务费
+丙公司,甲公司,60000,2026-01-04,往来款</pre>
+  <p>TXT 可使用制表符、逗号、竖线或分号分隔，也支持逐行键值格式：</p>
+  <pre>付款方=甲公司 收款方=乙公司 金额=100000 日期=2026-01-02</pre>
+  <p>JSON 格式可使用对象数组，例如：</p>
+  <pre>[
+  {"付款方":"甲公司","收款方":"乙公司","金额":100000,"日期":"2026-01-02"}
+]</pre>
+  <p class="hint">节点可直接拖动调整位置；拖动空白区域可平移画布。工具在浏览器本地处理数据，不会主动上传文件。Excel 文件解析通过公共 CDN 动态加载 SheetJS 组件。</p>
+  <div style="text-align:right"><button class="primary" id="closeModal">知道了</button></div>
+</div></div>
+
+<script>
+let rawRows=[], headers=[], graphState=null, scale=1, panX=0, panY=0, dragging=false, dragStart=null, draggingNode=null, nodeMoved=false;
+
+const $=id=>document.getElementById(id);
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function fmt(n){return Number(n).toLocaleString('zh-CN',{maximumFractionDigits:2})}
+function parseMoney(v){if(typeof v==='number')return v;return Number(String(v??'').replace(/[￥¥,\s]/g,''))||0}
+
+function parseCSV(text){
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(c==='"'&&q&&n==='"'){cell+='"';i++}
+    else if(c==='"'){q=!q}
+    else if(c===','&&!q){row.push(cell);cell=''}
+    else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&n==='\n')i++;row.push(cell);cell='';if(row.some(x=>x!==''))rows.push(row);row=[]}
+    else cell+=c;
+  }
+  row.push(cell);if(row.some(x=>x!==''))rows.push(row);
+  const hs=rows.shift()||[];
+  return rows.map(r=>Object.fromEntries(hs.map((h,i)=>[h.trim(),r[i]??''])));
+}
+
+
+function parseTXT(text){
+  const clean=text.trim();
+  if(!clean)return [];
+  // JSON content saved as .txt
+  if(clean.startsWith('[')||clean.startsWith('{')){
+    try{
+      const parsed=JSON.parse(clean);
+      return Array.isArray(parsed)?parsed:[parsed];
+    }catch(e){}
+  }
+  const lines=clean.split(/\r?\n/).filter(x=>x.trim());
+  // Auto-detect common delimiters
+  const candidates=['\t','|',';',','];
+  let delimiter=candidates
+    .map(d=>({d,score:lines.slice(0,8).reduce((s,l)=>s+(l.split(d).length-1),0)}))
+    .sort((a,b)=>b.score-a.score)[0];
+  if(delimiter&&delimiter.score>0){
+    if(delimiter.d===',')return parseCSV(clean);
+    const matrix=lines.map(line=>line.split(delimiter.d).map(x=>x.trim().replace(/^["']|["']$/g,'')));
+    const hs=matrix.shift()||[];
+    return matrix.map(r=>Object.fromEntries(hs.map((h,i)=>[h,r[i]??''])));
+  }
+  // Supports: 付款方=甲公司 收款方=乙公司 金额=1000
+  const kvRows=lines.map(line=>{
+    const obj={};
+    const matches=line.matchAll(/([^=：,\s]+)\s*[=：]\s*([^,\s]+)/g);
+    for(const m of matches)obj[m[1].trim()]=m[2].trim();
+    return obj;
+  }).filter(x=>Object.keys(x).length);
+  if(kvRows.length)return kvRows;
+  throw new Error('无法识别 TXT 格式，请使用制表符、逗号、竖线或分号分隔字段');
+}
+
+async function readFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'||ext==='txt'){
+    const buf=await file.arrayBuffer();
+    let text;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('gb18030').decode(buf)}
+    text=text.replace(/^\uFEFF/,'');
+    if(ext==='txt') return parseTXT(text);
+    return parseCSV(text);
+  }
+  if(ext==='json') return JSON.parse(await file.text());
+  if(['xlsx','xls'].includes(ext)){
+    await loadXLSX();
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+  }
+  throw new Error('不支持的文件格式');
+}
+function loadXLSX(){
+  if(window.XLSX)return Promise.resolve();
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=resolve;s.onerror=()=>reject(new Error('Excel 解析组件加载失败，请检查网络'));
+    document.head.appendChild(s);
+  })
+}
+function loadRows(rows,name='数据'){
+  if(!Array.isArray(rows)||!rows.length)throw new Error('文件中没有可用数据');
+  rawRows=rows;headers=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+  fillMappings();renderTable();$('txCount').textContent=rawRows.length;toast(`${name} 已导入，共 ${rawRows.length} 条`);
+}
+function fillMappings(){
+  const selects=['sourceCol','targetCol','amountCol','dateCol','remarkCol'];
+  const guess={
+    sourceCol:['付款方','转出方','来源','source','from','付款账户','付款人','借方'],
+    targetCol:['收款方','转入方','去向','target','to','收款账户','收款人','贷方'],
+    amountCol:['金额','交易金额','amount','money','发生额'],
+    dateCol:['日期','交易日期','时间','date','time'],
+    remarkCol:['备注','摘要','用途','remark','memo','description']
+  };
+  selects.forEach(id=>{
+    const sel=$(id);sel.innerHTML='<option value="">-- 未选择 --</option>'+headers.map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join('');
+    const found=headers.find(h=>guess[id].some(g=>h.toLowerCase().includes(g.toLowerCase())));
+    if(found)sel.value=found;
+  });
+}
+function renderTable(){
+  $('dataTable').querySelector('thead').innerHTML='<tr>'+headers.slice(0,6).map(h=>`<th>${esc(h)}</th>`).join('')+'</tr>';
+  $('dataTable').querySelector('tbody').innerHTML=rawRows.slice(0,100).map(r=>'<tr>'+headers.slice(0,6).map(h=>`<td>${esc(r[h])}</td>`).join('')+'</tr>').join('');
+}
+function buildGraph(){
+  const sc=$('sourceCol').value,tc=$('targetCol').value,ac=$('amountCol').value,dc=$('dateCol').value,rc=$('remarkCol').value;
+  if(!sc||!tc||!ac){toast('请选择付款方、收款方和金额字段');return}
+  const min=Number($('minAmount').value)||0, agg=$('aggregate').value==='yes';
+  let tx=rawRows.map((r,i)=>({source:String(r[sc]??'').trim(),target:String(r[tc]??'').trim(),amount:parseMoney(r[ac]),date:dc?r[dc]:'',remark:rc?r[rc]:'',index:i}))
+    .filter(x=>x.source&&x.target&&x.amount>=min);
+  const nodes=[...new Set(tx.flatMap(x=>[x.source,x.target]))].map(id=>({id}));
+  let edges;
+  if(agg){
+    const map=new Map();
+    tx.forEach(t=>{const k=t.source+'\u0000'+t.target;if(!map.has(k))map.set(k,{source:t.source,target:t.target,amount:0,count:0,rows:[]});const e=map.get(k);e.amount+=t.amount;e.count++;e.rows.push(t)});
+    edges=[...map.values()];
+  }else edges=tx.map(t=>({...t,count:1,rows:[t]}));
+  const cycles=findCycles(nodes.map(n=>n.id),edges);
+  const cycleEdges=new Set();
+  cycles.forEach(c=>{for(let i=0;i<c.length-1;i++)cycleEdges.add(c[i]+'\u0000'+c[i+1])});
+  edges.forEach(e=>e.inCycle=cycleEdges.has(e.source+'\u0000'+e.target));
+  graphState={nodes,edges,cycles,tx};
+  $('txCount').textContent=tx.length;$('nodeCount').textContent=nodes.length;$('cycleCount').textContent=cycles.length;
+  renderGraph();
+}
+function findCycles(nodeIds,edges){
+  const adj=new Map(nodeIds.map(n=>[n,[]]));edges.forEach(e=>adj.get(e.source)?.push(e.target));
+  const result=[],seen=new Set(),maxCycles=50;
+  function canon(c){
+    const arr=c.slice(0,-1),rots=arr.map((_,i)=>arr.slice(i).concat(arr.slice(0,i)));
+    rots.sort((a,b)=>a.join('\u0001').localeCompare(b.join('\u0001')));
+    return rots[0].join('\u0001');
+  }
+  function dfs(start,cur,path,vis){
+    if(result.length>=maxCycles)return;
+    for(const nxt of adj.get(cur)||[]){
+      if(nxt===start&&path.length>1){const cyc=path.concat(start),k=canon(cyc);if(!seen.has(k)){seen.add(k);result.push(cyc)}}
+      else if(!vis.has(nxt)&&path.length<Math.min(nodeIds.length,10)){vis.add(nxt);dfs(start,nxt,path.concat(nxt),vis);vis.delete(nxt)}
+    }
+  }
+  nodeIds.forEach(s=>dfs(s,s,[s],new Set([s])));
+  return result;
+}
+function renderGraph(preservePositions=false){
+  if(!graphState)return;
+  const svg=$('svg'),w=$('canvasWrap').clientWidth,h=$('canvasWrap').clientHeight;
+  const {nodes,edges,cycles}=graphState;
+  if(!nodes.length){svg.innerHTML='';$('empty').style.display='flex';return}
+  $('empty').style.display='none';$('legend').style.display='block';
+  $('cyclePanel').style.display=cycles.length?'block':'none';
+  $('cycleItems').innerHTML=cycles.map((c,i)=>`<div class="cycle-item">${i+1}. ${c.map(esc).join(' → ')}</div>`).join('');
+  if(!preservePositions)layoutNodes(nodes,w,h);
+  const maxAmt=Math.max(...edges.map(e=>e.amount),1),minAmt=Math.min(...edges.map(e=>e.amount),0);
+  const defs=`<defs>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#102a4d"/><stop offset="55%" stop-color="#15204b"/><stop offset="100%" stop-color="#32185a"/></linearGradient>
+    <linearGradient id="nodeHitGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#063b52"/><stop offset="50%" stop-color="#123b67"/><stop offset="100%" stop-color="#40206b"/></linearGradient>
+    <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+    <linearGradient id="cycleGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#ff2e88"/><stop offset="100%" stop-color="#ff9f43"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#00e5ff"/></marker>
+    <marker id="arrowCycle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff2e88"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#00e5ff" flood-opacity=".22"/></filter>
+    <filter id="cycleGlow"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ff2e88" flood-opacity=".55"/></filter>
+  </defs>`;
+  const nodeMap=new Map(nodes.map(n=>[n.id,n]));
+  let edgeSvg='';
+  edges.forEach((e,idx)=>{
+    const a=nodeMap.get(e.source),b=nodeMap.get(e.target);if(!a||!b)return;
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+    const sx=a.x+ux*43,sy=a.y+uy*27,ex=b.x-ux*43,ey=b.y-uy*27;
+    const same=edges.filter(x=>x.source===e.source&&x.target===e.target).length>1;
+    const curve=same?(idx%2?20:-20):0, mx=(sx+ex)/2-uy*curve,my=(sy+ey)/2+ux*curve;
+    const d=`M${sx},${sy} Q${mx},${my} ${ex},${ey}`;
+    const width=1.5+5*Math.sqrt(e.amount/maxAmt);
+    const color=e.inCycle?'url(#cycleGrad)':'url(#edgeGrad)';
+    edgeSvg+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-opacity=".9" ${e.inCycle?'filter="url(#cycleGlow)"':''} marker-end="url(#${e.inCycle?'arrowCycle':'arrow'})"><title>${esc(e.source)} → ${esc(e.target)}\n金额：${fmt(e.amount)}\n笔数：${e.count}</title></path>`;
+    edgeSvg+=`<text class="edge-label" x="${mx}" y="${my-5}" text-anchor="middle">${fmt(e.amount)}</text>`;
+  });
+  const search=$('searchNode').value.trim().toLowerCase();
+  let nodeSvg='';
+  nodes.forEach(n=>{
+    const hit=!search||n.id.toLowerCase().includes(search),fill=hit?'url(#nodeHitGrad)':'url(#nodeGrad)',stroke=hit?'#00e5ff':'#7558dd';
+    nodeSvg+=`<g class="node" data-node-id="${esc(n.id)}" transform="translate(${n.x},${n.y})" filter="url(#shadow)" style="cursor:grab">
+      <rect x="-45" y="-25" width="90" height="50" rx="12" fill="${fill}" stroke="${stroke}" stroke-width="${hit?2:1}"/>
+      <text text-anchor="middle" dominant-baseline="middle" fill="#f4fbff" font-weight="600">${esc(n.id.length>12?n.id.slice(0,11)+'…':n.id)}</text>
+      <title>${esc(n.id)}</title></g>`;
+  });
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  svg.innerHTML=defs+`<g id="viewport" transform="translate(${panX},${panY}) scale(${scale})">${edgeSvg}${nodeSvg}</g>`;
+}
+function layoutNodes(nodes,w,h){
+  const mode=$('layoutMode').value,cx=w/2,cy=h/2;
+  if(mode==='circle'){
+    const r=Math.max(120,Math.min(w,h)*.36);
+    nodes.forEach((n,i)=>{const a=-Math.PI/2+i*2*Math.PI/nodes.length;n.x=cx+r*Math.cos(a);n.y=cy+r*Math.sin(a)})
+  }else{
+    const indeg=new Map(nodes.map(n=>[n.id,0]));graphState.edges.forEach(e=>indeg.set(e.target,(indeg.get(e.target)||0)+1));
+    const roots=nodes.filter(n=>indeg.get(n.id)===0).map(n=>n.id);const level=new Map(),q=(roots.length?roots:[nodes[0].id]).map(x=>(level.set(x,0),x));
+    while(q.length){const u=q.shift();graphState.edges.filter(e=>e.source===u).forEach(e=>{if(!level.has(e.target)){level.set(e.target,level.get(u)+1);q.push(e.target)}})}
+    nodes.forEach(n=>{if(!level.has(n.id))level.set(n.id,0)});
+    const groups={};nodes.forEach(n=>(groups[level.get(n.id)]??=[]).push(n));
+    const levs=Object.keys(groups).map(Number).sort((a,b)=>a-b);
+    levs.forEach((l,li)=>groups[l].forEach((n,i)=>{n.x=90+(w-180)*(levs.length===1?.5:li/(levs.length-1));n.y=70+(h-140)*(groups[l].length===1?.5:i/(groups[l].length-1))}));
+  }
+}
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportSVG(){
+  if(!graphState)return toast('请先生成图');
+  const clone=$('svg').cloneNode(true);clone.setAttribute('width',$('canvasWrap').clientWidth);clone.setAttribute('height',$('canvasWrap').clientHeight);
+  download('资金闭环图.svg',new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml'}))
+}
+function exportPNG(){
+  if(!graphState)return toast('请先生成图');
+  const svgText=new XMLSerializer().serializeToString($('svg')),img=new Image(),url=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml'}));
+  img.onload=()=>{const c=document.createElement('canvas');c.width=$('canvasWrap').clientWidth*2;c.height=$('canvasWrap').clientHeight*2;const ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,$('canvasWrap').clientWidth,$('canvasWrap').clientHeight);c.toBlob(b=>download('资金闭环图.png',b));URL.revokeObjectURL(url)};img.src=url;
+}
+function exportHTML(){
+  let text='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  if(rawRows.length){
+    const payload=JSON.stringify(rawRows).replace(/</g,'\\u003c');
+    text=text.replace('</body>',`<script>window.addEventListener('load',()=>{try{loadRows(${payload},'内嵌数据');buildGraph()}catch(e){console.error(e)}})<\/script></body>`);
+  }
+  download('资金闭环图工具.html',new Blob([text],{type:'text/html;charset=utf-8'}));toast('HTML 已导出');
+}
+const sample=[
+  {付款方:'甲公司',收款方:'乙公司',金额:120000,日期:'2026-01-02',备注:'采购款'},
+  {付款方:'乙公司',收款方:'丙公司',金额:98000,日期:'2026-01-03',备注:'服务费'},
+  {付款方:'丙公司',收款方:'甲公司',金额:76000,日期:'2026-01-05',备注:'往来款'},
+  {付款方:'甲公司',收款方:'丁公司',金额:42000,日期:'2026-01-06',备注:'咨询费'},
+  {付款方:'丁公司',收款方:'戊公司',金额:35000,日期:'2026-01-08',备注:'项目款'},
+  {付款方:'戊公司',收款方:'甲公司',金额:28000,日期:'2026-01-09',备注:'退款'},
+  {付款方:'乙公司',收款方:'丁公司',金额:21000,日期:'2026-01-10',备注:'代付款'}
+];
+
+$('drop').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=async e=>{try{loadRows(await readFile(e.target.files[0]),e.target.files[0].name)}catch(err){toast(err.message)}};
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};
+$('drop').ondragleave=()=>$('drop').classList.remove('drag');
+$('drop').ondrop=async e=>{e.preventDefault();$('drop').classList.remove('drag');try{const f=e.dataTransfer.files[0];loadRows(await readFile(f),f.name)}catch(err){toast(err.message)}};
+$('sampleBtn').onclick=()=>{loadRows(sample,'示例数据');buildGraph()};
+$('drawBtn').onclick=buildGraph;
+$('layoutMode').onchange=renderGraph;$('searchNode').oninput=renderGraph;
+$('zoomIn').onclick=()=>{scale=Math.min(3,scale*1.2);renderGraph(true)};$('zoomOut').onclick=()=>{scale=Math.max(.35,scale/1.2);renderGraph(true)};
+$('resetView').onclick=()=>{scale=1;panX=panY=0;renderGraph(true)};
+$('exportSvg').onclick=exportSVG;$('exportPng').onclick=exportPNG;$('exportHtmlBtn').onclick=exportHTML;
+$('helpBtn').onclick=()=>$('modal').classList.add('open');$('closeModal').onclick=()=>$('modal').classList.remove('open');
+$('modal').onclick=e=>{if(e.target===$('modal'))$('modal').classList.remove('open')};
+$('svg').addEventListener('mousedown',e=>{
+  const nodeEl=e.target.closest?.('.node');
+  if(nodeEl&&graphState){
+    draggingNode=graphState.nodes.find(n=>n.id===nodeEl.dataset.nodeId);
+    if(draggingNode){
+      const rect=$('svg').getBoundingClientRect();
+      const gx=(e.clientX-rect.left-panX)/scale,gy=(e.clientY-rect.top-panY)/scale;
+      dragStart={x:gx-draggingNode.x,y:gy-draggingNode.y};
+      nodeMoved=false;
+      nodeEl.style.cursor='grabbing';
+      e.stopPropagation();
+      return;
+    }
+  }
+  dragging=true;dragStart={x:e.clientX-panX,y:e.clientY-panY};
+});
+window.addEventListener('mousemove',e=>{
+  if(draggingNode){
+    const rect=$('svg').getBoundingClientRect();
+    draggingNode.x=(e.clientX-rect.left-panX)/scale-dragStart.x;
+    draggingNode.y=(e.clientY-rect.top-panY)/scale-dragStart.y;
+    nodeMoved=true;renderGraph(true);return;
+  }
+  if(dragging){panX=e.clientX-dragStart.x;panY=e.clientY-dragStart.y;renderGraph(true)}
+});
+window.addEventListener('mouseup',()=>{
+  dragging=false;
+  if(draggingNode&&nodeMoved)toast('节点位置已调整');
+  draggingNode=null;nodeMoved=false;
+});
+$('svg').addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.35,Math.min(3,scale*(e.deltaY<0?1.1:.9)));renderGraph(true)},{passive:false});
+window.addEventListener('resize',()=>graphState&&renderGraph(true));
+</script>
+</body>
+</html>
