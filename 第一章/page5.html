@@ -1,1 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>律师接待谈话笔录编辑器</title>
+<style>
+  :root{
+    --blue:#1677ff;
+    --blue-soft:#eef6ff;
+    --orange:#fa8c16;
+    --orange-soft:#fff7e8;
+    --green:#16a34a;
+    --red:#dc2626;
+    --ink:#1f2937;
+    --muted:#64748b;
+    --line:#dbe4f0;
+    --panel:#f7f9fc;
+    --shadow:0 12px 36px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:#eef2f7;
+    color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;
+  }
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer}
+  .app{
+    width:min(1120px,calc(100% - 28px));
+    margin:22px auto 40px;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .app-head{
+    padding:22px 26px 10px;
+    background:linear-gradient(180deg,#fff,#fbfdff);
+  }
+  .app-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:18px;
+  }
+  .app-title h1{font-size:22px;margin:0}
+  .save-state{font-size:13px;color:var(--muted)}
+  .case-grid{
+    display:grid;
+    grid-template-columns:1.5fr 1fr 1fr;
+    gap:14px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .field label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:6px;
+    color:#334155;
+  }
+  input,select,textarea{
+    width:100%;
+    border:1px solid #cbd7e6;
+    border-radius:7px;
+    background:#fff;
+    color:var(--ink);
+    padding:10px 11px;
+    outline:none;
+  }
+  input:focus,select:focus,textarea:focus{
+    border-color:var(--blue);
+    box-shadow:0 0 0 3px rgba(22,119,255,.12);
+  }
+  .content-wrap{padding:18px 26px 26px}
+  .entry-panel{
+    display:grid;
+    grid-template-columns:220px 1fr;
+    gap:16px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+  }
+  .entry-panel textarea{height:132px;resize:vertical}
+  .entry-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:10px;
+  }
+  .btn{
+    border:1px solid transparent;
+    border-radius:7px;
+    padding:8px 14px;
+    font-weight:700;
+    background:#fff;
+    color:#334155;
+  }
+  .btn-light{border-color:#cbd7e6}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-orange{background:#ea7600;color:#fff}
+  .btn-red{background:var(--red);color:#fff}
+  .btn-sm{padding:5px 9px;font-size:12px}
+  .section-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:20px 0 10px;
+  }
+  .section-title h2{font-size:17px;margin:0}
+  .record{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:14px;
+    margin:10px 0;
+    padding:12px 14px;
+    border-radius:8px;
+    border-left:4px solid;
+  }
+  .record.lawyer{background:var(--blue-soft);border-color:var(--blue)}
+  .record.client{background:var(--orange-soft);border-color:var(--orange)}
+  .record.other{background:#f5f3ff;border-color:#7c3aed}
+  .record-top{display:flex;align-items:center;gap:14px;margin-bottom:7px}
+  .record-role{font-weight:800}
+  .record-time{font-size:12px;color:var(--muted)}
+  .record-content{line-height:1.75;white-space:pre-wrap;word-break:break-word}
+  .record-tools{display:flex;gap:6px;align-items:flex-start}
+  .empty{
+    text-align:center;
+    color:#94a3b8;
+    border:1px dashed #cbd5e1;
+    border-radius:9px;
+    padding:24px;
+  }
+  .two-col{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:20px;
+  }
+  .card{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    background:#fff;
+  }
+  .risk-card{background:#fffaf2;border-color:#fed7aa}
+  .card h3{margin:0 0 12px;font-size:17px}
+  .checks{display:grid;gap:8px;margin-top:10px}
+  .checks label{display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.5}
+  .checks input{width:auto;margin-top:3px}
+  .signature-wrap{
+    border:1px dashed #94a3b8;
+    background:#fff;
+    height:155px;
+    border-radius:8px;
+    overflow:hidden;
+  }
+  #signatureCanvas{width:100%;height:100%;touch-action:none;display:block}
+  .signature-actions{display:flex;justify-content:flex-end;margin-top:8px}
+  .statement{
+    min-height:118px;
+    resize:vertical;
+    line-height:1.75;
+  }
+  .settings{
+    margin-top:20px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    background:#f8fafc;
+  }
+  .settings-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr 1fr 1fr;
+    gap:12px;
+    align-items:end;
+  }
+  .footer-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:9px;
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid var(--line);
+  }
+  .stat{
+    margin-right:auto;
+    display:flex;
+    align-items:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* A4 打印容器 */
+  #printRoot{display:none}
+  .print-page{
+    position:relative;
+    width:210mm;
+    height:297mm;
+    padding:20mm 18mm 18mm;
+    background:#fff;
+    overflow:hidden;
+    page-break-after:always;
+  }
+  .print-page:last-child{page-break-after:auto}
+  .print-header{
+    text-align:center;
+    padding-bottom:8mm;
+  }
+  .print-firm{font-size:14px;letter-spacing:1px}
+  .print-title{font-size:23px;font-weight:800;margin-top:3mm}
+  .print-meta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:3mm 9mm;
+    font-size:13px;
+    line-height:1.6;
+    padding:4mm 0;
+    border-top:1px solid #444;
+    border-bottom:1px solid #444;
+  }
+  .print-body{
+    position:relative;
+    z-index:2;
+    font-size:14px;
+    line-height:1.75;
+  }
+  .print-block{
+    break-inside:avoid;
+    page-break-inside:avoid;
+    margin-bottom:5mm;
+  }
+  .print-record{
+    border-bottom:1px dashed #aaa;
+    padding-bottom:4mm;
+  }
+  .print-record:last-child{border-bottom:0}
+  .print-record-head{font-weight:700;margin-bottom:1mm}
+  .print-record-time{font-size:12px;color:#555;margin-left:6mm}
+  .print-section-title{
+    font-size:16px;
+    font-weight:800;
+    margin:2mm 0 3mm;
+    padding-bottom:2mm;
+    border-bottom:1px solid #666;
+  }
+  .print-footer{
+    position:absolute;
+    left:18mm;
+    right:18mm;
+    bottom:8mm;
+    text-align:center;
+    font-size:11px;
+    color:#444;
+    z-index:3;
+  }
+  .print-watermark{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:1;
+    overflow:hidden;
+  }
+  .wm-item{
+    position:absolute;
+    transform-origin:center;
+    white-space:nowrap;
+    color:#444;
+  }
+  .sign-image{
+    max-width:65mm;
+    max-height:25mm;
+    vertical-align:middle;
+  }
+  .signature-line{margin-top:8mm;display:grid;grid-template-columns:1fr 1fr;gap:12mm}
+  .signature-line div{min-height:14mm}
+  .print-risk-list{margin:2mm 0 0;padding-left:6mm}
+  .print-risk-list li{margin-bottom:1mm}
+  .print-note{white-space:pre-wrap}
+  .page-measure{
+    position:absolute;
+    visibility:hidden;
+    width:174mm;
+    font-size:14px;
+    line-height:1.75;
+  }
+
+  @media(max-width:800px){
+    .case-grid,.entry-panel,.two-col,.settings-grid{grid-template-columns:1fr}
+    .record{grid-template-columns:1fr}
+    .record-tools{justify-content:flex-end}
+  }
+  @media print{
+    body{background:#fff}
+    .app{display:none!important}
+    #printRoot{display:block!important}
+    @page{size:A4;margin:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-head">
+    <div class="app-title">
+      <h1>⚖ 律师接待谈话笔录编辑器</h1>
+      <div class="save-state" id="saveState">尚未保存</div>
+    </div>
+    <div class="case-grid">
+      <div class="field"><label>📁 案号 / 案由</label><input id="caseName" placeholder="例如：民间借贷纠纷"></div>
+      <div class="field"><label>👤 当事人</label><input id="clientName" placeholder="姓名"></div>
+      <div class="field"><label>⚖ 接待律师</label><input id="lawyerName" placeholder="律师姓名"></div>
+      <div class="field"><label>案号</label><input id="caseNo" placeholder="可选"></div>
+      <div class="field"><label>接待时间</label><input id="receptionTime"></div>
+      <div class="field"><label>接待地点</label><input id="place" placeholder="例如：本所会议室"></div>
+    </div>
+  </div>
+
+  <div class="content-wrap">
+    <div class="entry-panel">
+      <div class="field">
+        <label>发言角色</label>
+        <select id="role">
+          <option value="律师">⚖ 律师</option>
+          <option value="当事人">👤 当事人</option>
+          <option value="第三方">👥 第三方</option>
+          <option value="公司代表">🏢 公司代表</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>谈话内容</label>
+        <textarea id="recordInput" placeholder="请输入谈话内容。点击“插入时间”可指定本条记录时间；未指定时，添加记录会自动生成时间。"></textarea>
+        <div class="entry-actions">
+          <button class="btn btn-light" type="button" onclick="insertTime()">◷ 插入时间</button>
+          <button class="btn btn-primary" type="button" onclick="addRecord()">＋ 添加记录</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h2>谈话记录</h2>
+      <span id="recordCount" style="font-size:13px;color:#64748b">共 0 条</span>
+    </div>
+    <div id="records"></div>
+
+    <div class="two-col">
+      <section class="card risk-card">
+        <h3>⚠ 案件风险提示</h3>
+        <div class="field">
+          <label>风险等级</label>
+          <select id="riskLevel">
+            <option>低风险</option>
+            <option selected>一般风险</option>
+            <option>高风险</option>
+            <option>重大风险</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>风险说明</label>
+          <textarea id="riskText" style="height:116px;resize:vertical" placeholder="填写案件难点、证据不足、诉讼时效、执行等风险"></textarea>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="noticeLitigation">已说明诉讼结果存在不确定性</label>
+          <label><input type="checkbox" id="noticeEvidence">已说明证据不足或举证不能风险</label>
+          <label><input type="checkbox" id="noticePeriod">已说明诉讼周期及费用风险</label>
+          <label><input type="checkbox" id="noticeExecution">已说明胜诉后仍可能存在执行风险</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>✍ 当事人确认与签字</h3>
+        <textarea id="statement" class="statement">本人确认：
+1. 以上谈话内容系本人真实陈述；
+2. 本人已阅读并确认本笔录内容准确无误；
+3. 本人已知悉律师提示的相关法律风险；
+4. 本人提交的材料真实、完整，并愿承担相应法律责任。</textarea>
+        <div class="two-col" style="grid-template-columns:1fr 1fr;margin-top:10px">
+          <div class="field"><label>签字人姓名</label><input id="signName"></div>
+          <div class="field"><label>确认日期</label><input id="signDate"></div>
+        </div>
+        <div style="font-size:13px;font-weight:700;margin:12px 0 6px">手写签名</div>
+        <div class="signature-wrap"><canvas id="signatureCanvas"></canvas></div>
+        <div class="signature-actions">
+          <button class="btn btn-light btn-sm" type="button" onclick="clearSignature()">清除签名</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="settings">
+      <h3 style="margin:0 0 12px">⚙ 水印设置</h3>
+      <div class="settings-grid">
+        <div class="field"><label>水印文字</label><input id="watermarkText" value="律师事务所内部资料"></div>
+        <div class="field"><label>透明度</label><input id="watermarkOpacity" type="number" min="0.03" max="0.35" step="0.01" value="0.10"></div>
+        <div class="field"><label>旋转角度</label><input id="watermarkAngle" type="number" min="-90" max="90" value="-30"></div>
+        <div class="field"><label>字号(px)</label><input id="watermarkSize" type="number" min="18" max="70" value="30"></div>
+      </div>
+    </section>
+
+    <div class="footer-actions">
+      <div class="stat">数据保存在当前浏览器本地</div>
+      <button class="btn btn-light" onclick="saveData(true)">保存</button>
+      <button class="btn btn-light" onclick="exportJSON()">导出 JSON</button>
+      <button class="btn btn-light" onclick="exportTXT()">导出 TXT</button>
+      <button class="btn btn-orange" onclick="document.getElementById('jsonFile').click()">导入 JSON</button>
+      <button class="btn btn-green" onclick="exportWord()">导出 Word</button>
+      <button class="btn btn-primary" onclick="exportPDF()">导出 PDF</button>
+      <button class="btn btn-red" onclick="clearAll()">清空全部</button>
+      <input id="jsonFile" type="file" accept=".json,application/json" hidden>
+    </div>
+  </div>
+</div>
+
+<div id="printRoot"></div>
+
+<script>
+"use strict";
+const STORAGE_KEY = "lawyer_reception_record_v5";
+let records = [];
+let signatureData = "";
+let signatureDirty = false;
+
+function $(id){ return document.getElementById(id); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function formatDateTime(d=new Date()){
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function formatDate(d=new Date()){
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function escapeHtml(s=""){
+  return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function safeFileName(name){
+  return (name || "律师接待谈话笔录").replace(/[\\/:*?"<>|]/g,"_");
+}
+
+function insertTime(){
+  const input = $("recordInput");
+  const marker = `【${formatDateTime()}】`;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const before = input.value.slice(0,start);
+  const after = input.value.slice(end);
+  const prefix = before && !before.endsWith("\n") ? "\n" : "";
+  const suffix = after && !after.startsWith("\n") ? "\n" : "";
+  input.value = before + prefix + marker + suffix + after;
+  input.focus();
+  input.selectionStart = input.selectionEnd = (before + prefix + marker + suffix).length;
+}
+
+function extractTimeAndContent(raw){
+  const re = /【\s*(\d{4}[-\/年]\d{1,2}[-\/月]\d{1,2}(?:日)?\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*】/;
+  const m = raw.match(re);
+  return {
+    time: m ? m[1].replace(/年|月/g,"-").replace("日","") : formatDateTime(),
+    content: raw.replace(re,"").trim()
+  };
+}
+
+function addRecord(){
+  const raw = $("recordInput").value.trim();
+  if(!raw){ alert("请输入谈话内容。"); return; }
+
+  // 在添加新记录前，检查上一条记录是否缺少时间；如缺少则自动补齐。
+  if(records.length && !records[records.length-1].time){
+    records[records.length-1].time = formatDateTime();
+    records[records.length-1].autoTimeFilled = true;
+  }
+
+  const parsed = extractTimeAndContent(raw);
+  if(!parsed.content){ alert("请在时间标记之外输入谈话内容。"); return; }
+
+  records.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()),
+    role: $("role").value,
+    time: parsed.time || formatDateTime(),
+    content: parsed.content,
+    createdAt: formatDateTime(),
+    updatedAt: ""
+  });
+
+  $("recordInput").value = "";
+  renderRecords();
+  saveData();
+  $("recordInput").focus();
+}
+
+function roleClass(role){
+  if(role==="律师") return "lawyer";
+  if(role==="当事人") return "client";
+  return "other";
+}
+function roleIcon(role){
+  return ({律师:"⚖",当事人:"👤",第三方:"👥",公司代表:"🏢"})[role] || "●";
+}
+function renderRecords(){
+  const box = $("records");
+  $("recordCount").textContent = `共 ${records.length} 条`;
+  if(!records.length){
+    box.innerHTML = `<div class="empty">暂无谈话记录</div>`;
+    return;
+  }
+  box.innerHTML = records.map((r,i)=>`
+    <article class="record ${roleClass(r.role)}">
+      <div>
+        <div class="record-top">
+          <span class="record-role">${roleIcon(r.role)} ${escapeHtml(r.role)}</span>
+          <span class="record-time">${escapeHtml(r.time || "未记录时间")}${r.updatedAt ? ` · 修改于 ${escapeHtml(r.updatedAt)}`:""}</span>
+        </div>
+        <div class="record-content">${escapeHtml(r.content)}</div>
+      </div>
+      <div class="record-tools">
+        <button class="btn btn-light btn-sm" onclick="editRecord(${i})">✎ 修改</button>
+        <button class="btn btn-red btn-sm" onclick="deleteRecord(${i})">删除</button>
+      </div>
+    </article>`).join("");
+}
+
+function editRecord(i){
+  const r = records[i];
+  const value = prompt("修改谈话内容：", r.content);
+  if(value===null) return;
+  if(!value.trim()){ alert("内容不能为空。"); return; }
+  r.content = value.trim();
+  r.updatedAt = formatDateTime();
+  renderRecords();
+  saveData();
+}
+function deleteRecord(i){
+  if(!confirm("确认删除该条记录？")) return;
+  records.splice(i,1);
+  renderRecords();
+  saveData();
+}
+
+function collectData(){
+  return {
+    version:"5.0",
+    caseInfo:{
+      caseName:$("caseName").value,
+      clientName:$("clientName").value,
+      lawyerName:$("lawyerName").value,
+      caseNo:$("caseNo").value,
+      receptionTime:$("receptionTime").value,
+      place:$("place").value
+    },
+    records,
+    risk:{
+      level:$("riskLevel").value,
+      text:$("riskText").value,
+      notices:{
+        litigation:$("noticeLitigation").checked,
+        evidence:$("noticeEvidence").checked,
+        period:$("noticePeriod").checked,
+        execution:$("noticeExecution").checked
+      }
+    },
+    confirmation:{
+      statement:$("statement").value,
+      signName:$("signName").value,
+      signDate:$("signDate").value,
+      signature: signatureDirty ? $("signatureCanvas").toDataURL("image/png") : signatureData
+    },
+    watermark:{
+      text:$("watermarkText").value,
+      opacity:Number($("watermarkOpacity").value)||0.10,
+      angle:Number($("watermarkAngle").value)||-30,
+      size:Number($("watermarkSize").value)||30
+    },
+    savedAt:formatDateTime()
+  };
+}
+function applyData(d){
+  const c=d.caseInfo||{}, r=d.risk||{}, n=r.notices||{}, f=d.confirmation||{}, w=d.watermark||{};
+  $("caseName").value=c.caseName||"";
+  $("clientName").value=c.clientName||"";
+  $("lawyerName").value=c.lawyerName||"";
+  $("caseNo").value=c.caseNo||"";
+  $("receptionTime").value=c.receptionTime||formatDateTime();
+  $("place").value=c.place||"";
+  records=Array.isArray(d.records)?d.records:[];
+  $("riskLevel").value=r.level||"一般风险";
+  $("riskText").value=r.text||"";
+  $("noticeLitigation").checked=!!n.litigation;
+  $("noticeEvidence").checked=!!n.evidence;
+  $("noticePeriod").checked=!!n.period;
+  $("noticeExecution").checked=!!n.execution;
+  $("statement").value=f.statement||$("statement").value;
+  $("signName").value=f.signName||"";
+  $("signDate").value=f.signDate||formatDate();
+  signatureData=f.signature||"";
+  $("watermarkText").value=w.text||"律师事务所内部资料";
+  $("watermarkOpacity").value=w.opacity ?? 0.10;
+  $("watermarkAngle").value=w.angle ?? -30;
+  $("watermarkSize").value=w.size ?? 30;
+  renderRecords();
+  redrawSignature();
+}
+function saveData(showAlert=false){
+  const d=collectData();
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(d));
+  $("saveState").textContent=`已保存 ${d.savedAt}`;
+  if(showAlert) alert("保存成功。");
+}
+function loadData(){
+  const raw=localStorage.getItem(STORAGE_KEY);
+  if(!raw) return;
+  try{ applyData(JSON.parse(raw)); }
+  catch(e){ console.error(e); }
+}
+function clearAll(){
+  if(!confirm("确认清空全部案件信息、记录、风险提示和签名？此操作不可撤销。")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  records=[];
+  document.querySelectorAll("input[type=text], input:not([type]), textarea").forEach(el=>el.value="");
+  $("receptionTime").value=formatDateTime();
+  $("signDate").value=formatDate();
+  $("statement").value="本人确认：\n1. 以上谈话内容系本人真实陈述；\n2. 本人已阅读并确认本笔录内容准确无误；\n3. 本人已知悉律师提示的相关法律风险；\n4. 本人提交的材料真实、完整，并愿承担相应法律责任。";
+  ["noticeLitigation","noticeEvidence","noticePeriod","noticeExecution"].forEach(id=>$(id).checked=false);
+  $("riskLevel").value="一般风险";
+  $("watermarkText").value="律师事务所内部资料";
+  $("watermarkOpacity").value="0.10";
+  $("watermarkAngle").value="-30";
+  $("watermarkSize").value="30";
+  clearSignature();
+  renderRecords();
+  $("saveState").textContent="尚未保存";
+}
+
+function download(content,name,type){
+  const blob=content instanceof Blob?content:new Blob([content],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportJSON(){
+  const d=collectData();
+  download(JSON.stringify(d,null,2),`${safeFileName(d.caseInfo.caseName)}-笔录备份.json`,"application/json;charset=utf-8");
+}
+function exportTXT(){
+  const d=collectData();
+  const lines=[
+    "律师接待谈话笔录",
+    `案由：${d.caseInfo.caseName}`,
+    `案号：${d.caseInfo.caseNo}`,
+    `当事人：${d.caseInfo.clientName}`,
+    `接待律师：${d.caseInfo.lawyerName}`,
+    `接待时间：${d.caseInfo.receptionTime}`,
+    `地点：${d.caseInfo.place}`,
+    "",
+    "一、谈话记录",
+    ...d.records.flatMap((r,i)=>[
+      `第${String(i+1).padStart(3,"0")}条  【${r.time||""}】`,
+      `${r.role}：${r.content}`,
+      ""
+    ]),
+    "二、案件风险提示",
+    `风险等级：${d.risk.level}`,
+    d.risk.text,
+    "",
+    "三、当事人确认声明",
+    d.confirmation.statement,
+    `签字人：${d.confirmation.signName}`,
+    `日期：${d.confirmation.signDate}`
+  ];
+  download(lines.join("\r\n"),`${safeFileName(d.caseInfo.caseName)}-接待笔录.txt`,"text/plain;charset=utf-8");
+}
+
+$("jsonFile").addEventListener("change",e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const d=JSON.parse(reader.result);
+      applyData(d);saveData();
+      alert("导入成功。");
+    }catch(err){alert("导入失败：JSON 文件格式不正确。");}
+    e.target.value="";
+  };
+  reader.readAsText(file,"utf-8");
+});
+
+function checkedRiskNotices(d){
+  const labels=[];
+  if(d.risk.notices.litigation) labels.push("已说明诉讼结果存在不确定性");
+  if(d.risk.notices.evidence) labels.push("已说明证据不足或举证不能风险");
+  if(d.risk.notices.period) labels.push("已说明诉讼周期及费用风险");
+  if(d.risk.notices.execution) labels.push("已说明胜诉后仍可能存在执行风险");
+  return labels;
+}
+function makeWatermarkHTML(w){
+  if(!w.text) return "";
+  const positions=[
+    [28,42],[112,42],[68,105],[150,105],
+    [28,168],[112,168],[68,230],[150,230]
+  ];
+  return `<div class="print-watermark">`+positions.map(([x,y])=>
+    `<span class="wm-item" style="left:${x}mm;top:${y}mm;opacity:${w.opacity};font-size:${w.size}px;transform:rotate(${w.angle}deg)">${escapeHtml(w.text)}</span>`
+  ).join("")+`</div>`;
+}
+function printHeader(d,firstPage){
+  return `<header class="print-header">
+    <div class="print-firm">${escapeHtml(d.watermark.text || "律师事务所")}</div>
+    <div class="print-title">律师接待谈话笔录</div>
+  </header>
+  ${firstPage?`<div class="print-meta">
+    <div><strong>案由：</strong>${escapeHtml(d.caseInfo.caseName)}</div>
+    <div><strong>案号：</strong>${escapeHtml(d.caseInfo.caseNo)}</div>
+    <div><strong>当事人：</strong>${escapeHtml(d.caseInfo.clientName)}</div>
+    <div><strong>接待律师：</strong>${escapeHtml(d.caseInfo.lawyerName)}</div>
+    <div><strong>接待时间：</strong>${escapeHtml(d.caseInfo.receptionTime)}</div>
+    <div><strong>地点：</strong>${escapeHtml(d.caseInfo.place)}</div>
+  </div>`:""}`;
+}
+function buildPrintableBlocks(d){
+  const blocks=[];
+  blocks.push(`<div class="print-block"><div class="print-section-title">一、谈话记录</div></div>`);
+  if(!d.records.length){
+    blocks.push(`<div class="print-block print-note">暂无谈话记录。</div>`);
+  }else{
+    d.records.forEach((r,i)=>{
+      blocks.push(`<div class="print-block print-record">
+        <div class="print-record-head">第 ${String(i+1).padStart(3,"0")} 条　${escapeHtml(r.role)}
+          <span class="print-record-time">【${escapeHtml(r.time||"")}】</span>
+        </div>
+        <div class="print-note">${escapeHtml(r.content)}</div>
+      </div>`);
+    });
+  }
+  const notices=checkedRiskNotices(d);
+  blocks.push(`<div class="print-block">
+    <div class="print-section-title">二、案件风险提示</div>
+    <div><strong>风险等级：</strong>${escapeHtml(d.risk.level)}</div>
+    <div class="print-note" style="margin-top:2mm">${escapeHtml(d.risk.text||"无补充说明")}</div>
+    ${notices.length?`<ul class="print-risk-list">${notices.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:""}
+  </div>`);
+  blocks.push(`<div class="print-block">
+    <div class="print-section-title">三、当事人确认声明</div>
+    <div class="print-note">${escapeHtml(d.confirmation.statement)}</div>
+    <div class="signature-line">
+      <div><strong>当事人签名：</strong>${d.confirmation.signature?`<img class="sign-image" src="${d.confirmation.signature}">`:"________________"}</div>
+      <div><strong>签字人姓名：</strong>${escapeHtml(d.confirmation.signName)}</div>
+      <div><strong>接待律师签名：</strong>________________</div>
+      <div><strong>确认日期：</strong>${escapeHtml(d.confirmation.signDate)}</div>
+    </div>
+  </div>`);
+  return blocks;
+}
+
+/* 以实际 A4 可用高度进行分页，整条记录尽量不跨页 */
+function paginateForPrint(d){
+  const root=$("printRoot");
+  root.innerHTML="";
+  const blocks=buildPrintableBlocks(d);
+  const usableFirst=226; // mm，首 页含案件信息
+  const usableOther=250; // mm，续页
+  let pages=[];
+  let current=[];
+  let first=true;
+
+  const meas=document.createElement("div");
+  meas.className="page-measure";
+  document.body.appendChild(meas);
+
+  function heightMM(htmls, isFirst){
+    meas.innerHTML=`${printHeader(d,isFirst)}<div class="print-body">${htmls.join("")}</div>`;
+    const px=meas.getBoundingClientRect().height;
+    return px*25.4/96;
+  }
+
+  for(const block of blocks){
+    const limit=first?usableFirst:usableOther;
+    if(current.length && heightMM([...current,block],first)>limit){
+      pages.push(current);
+      current=[block];
+      first=false;
+    }else{
+      current.push(block);
+    }
+  }
+  if(current.length) pages.push(current);
+  meas.remove();
+
+  root.innerHTML=pages.map((page,i)=>`
+    <section class="print-page">
+      ${makeWatermarkHTML(d.watermark)}
+      ${printHeader(d,i===0)}
+      <main class="print-body">${page.join("")}</main>
+      <footer class="print-footer">第 ${i+1} 页 / 共 ${pages.length} 页</footer>
+    </section>`).join("");
+}
+function exportPDF(){
+  saveData();
+  const d=collectData();
+  paginateForPrint(d);
+  setTimeout(()=>window.print(),100);
+}
+function exportWord(){
+  const d=collectData();
+  const notices=checkedRiskNotices(d);
+  const recordHtml=d.records.map((r,i)=>`
+    <p><b>第 ${String(i+1).padStart(3,"0")} 条　${escapeHtml(r.role)}</b>　【${escapeHtml(r.time||"")}】</p>
+    <p style="white-space:pre-wrap">${escapeHtml(r.content)}</p>
+    <hr>`).join("");
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <style>
+    @page{size:A4;margin:20mm 18mm}
+    body{font-family:"Microsoft YaHei";font-size:14pt;line-height:1.7}
+    h1{text-align:center;font-size:22pt}
+    table{width:100%;border-collapse:collapse;margin-bottom:18pt}
+    td{border:1px solid #555;padding:6pt}
+    .wm{position:fixed;left:20%;top:42%;font-size:36pt;color:#ddd;transform:rotate(${d.watermark.angle}deg)}
+  </style></head><body>
+  <div class="wm">${escapeHtml(d.watermark.text)}</div>
+  <h1>律师接待谈话笔录</h1>
+  <table>
+    <tr><td>案由：${escapeHtml(d.caseInfo.caseName)}</td><td>案号：${escapeHtml(d.caseInfo.caseNo)}</td></tr>
+    <tr><td>当事人：${escapeHtml(d.caseInfo.clientName)}</td><td>接待律师：${escapeHtml(d.caseInfo.lawyerName)}</td></tr>
+    <tr><td>接待时间：${escapeHtml(d.caseInfo.receptionTime)}</td><td>地点：${escapeHtml(d.caseInfo.place)}</td></tr>
+  </table>
+  <h2>一、谈话记录</h2>${recordHtml||"<p>暂无谈话记录。</p>"}
+  <h2>二、案件风险提示</h2>
+  <p><b>风险等级：</b>${escapeHtml(d.risk.level)}</p>
+  <p style="white-space:pre-wrap">${escapeHtml(d.risk.text||"无补充说明")}</p>
+  ${notices.length?`<ul>${notices.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>`:""}
+  <h2>三、当事人确认声明</h2>
+  <p style="white-space:pre-wrap">${escapeHtml(d.confirmation.statement)}</p>
+  <p>当事人签名：${d.confirmation.signature?`<img src="${d.confirmation.signature}" style="max-width:220px;max-height:90px;vertical-align:middle">`:"________________"}</p>
+  <p>签字人姓名：${escapeHtml(d.confirmation.signName)}　　确认日期：${escapeHtml(d.confirmation.signDate)}</p>
+  <p>接待律师签名：________________</p>
+  </body></html>`;
+  download("\ufeff"+html,`${safeFileName(d.caseInfo.caseName)}-接待笔录.doc`,"application/msword;charset=utf-8");
+}
+
+/* 签名板 */
+let canvas,ctx,drawing=false,lastX=0,lastY=0;
+function initSignature(){
+  canvas=$("signatureCanvas");
+  ctx=canvas.getContext("2d");
+  resizeCanvas();
+
+  function point(e){
+    const rect=canvas.getBoundingClientRect();
+    const p=e.touches?e.touches[0]:e;
+    return {
+      x:(p.clientX-rect.left)*(canvas.width/rect.width),
+      y:(p.clientY-rect.top)*(canvas.height/rect.height)
+    };
+  }
+  function start(e){
+    e.preventDefault();drawing=true;signatureDirty=true;
+    const p=point(e);lastX=p.x;lastY=p.y;
+  }
+  function move(e){
+    if(!drawing)return;e.preventDefault();
+    const p=point(e);
+    ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);
+    ctx.lineWidth=2;ctx.lineCap="round";ctx.strokeStyle="#111";ctx.stroke();
+    lastX=p.x;lastY=p.y;
+  }
+  function end(){if(drawing){drawing=false;saveData();}}
+  canvas.addEventListener("mousedown",start);
+  canvas.addEventListener("mousemove",move);
+  window.addEventListener("mouseup",end);
+  canvas.addEventListener("touchstart",start,{passive:false});
+  canvas.addEventListener("touchmove",move,{passive:false});
+  canvas.addEventListener("touchend",end);
+}
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const existing=signatureDirty?canvas.toDataURL("image/png"):signatureData;
+  canvas.width=Math.max(600,Math.round(rect.width*2));
+  canvas.height=Math.max(220,Math.round(rect.height*2));
+  if(existing) drawDataURL(existing);
+}
+function drawDataURL(url){
+  if(!url)return;
+  const img=new Image();
+  img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  img.src=url;
+}
+function redrawSignature(){
+  if(!canvas)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(signatureData) drawDataURL(signatureData);
+  signatureDirty=false;
+}
+function clearSignature(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  signatureData="";signatureDirty=true;saveData();
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  $("receptionTime").value=formatDateTime();
+  $("signDate").value=formatDate();
+  initSignature();
+  loadData();
+  renderRecords();
+
+  document.querySelectorAll("input,select,textarea").forEach(el=>{
+    el.addEventListener("change",()=>saveData());
+  });
+  $("recordInput").addEventListener("keydown",e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();addRecord();}
+  });
+  window.addEventListener("resize",()=>{ if(canvas) resizeCanvas(); });
+});
+</script>
+</body>
+</html>
 
